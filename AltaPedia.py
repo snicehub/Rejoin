@@ -283,7 +283,7 @@ def countdown_timer(seconds, message=""):
     print()
 
 def menu_rejoin_server(config, installed_packages):
-    """Executes the automated rejoin process with staggered clone delays."""
+    """Executes the rejoin process once across all clones, then auto-closes Termux in 5s."""
     clear_screen()
     draw_banner()
     print(f"{Colors.HEADER}{Colors.BOLD}=== MENU: REJOIN SERVER AUTOMATION ==={Colors.ENDC}\n")
@@ -301,53 +301,59 @@ def menu_rejoin_server(config, installed_packages):
     for idx, pkg in enumerate(installed_packages, 1):
         print(f"  {idx}. {pkg}")
     print()
-    
-    print(f"{Colors.BOLD}Pengaturan Durasi Jeda Rejoin:{Colors.ENDC}")
-    try:
-        base_dur_input = input("Masukkan durasi dasar per-loop (dalam detik, default 60): ").strip()
-        base_duration = int(base_dur_input) if base_dur_input.isdigit() else 60
-    except ValueError:
-        base_duration = 60
 
-    print(f"\n{Colors.WARNING}[i] Skema kelipatan jeda clone diaktifkan:{Colors.ENDC}")
+    print(f"{Colors.WARNING}[i] Skema kelipatan jeda clone diaktifkan:{Colors.ENDC}")
     print(f"    - Main App / App 1: Langsung Buka")
     for i in range(1, len(installed_packages)):
         print(f"    - Clone #{i:<9} : +{i * 20} detik kelipatan")
         
-    print(f"\n{Colors.OKGREEN}[▶] Memulai Otomatisasi Rejoin Private Server... (Tekan Ctrl+C untuk Stop){Colors.ENDC}\n")
-    time.sleep(2)
+    print(f"\n{Colors.OKGREEN}[▶] Memulai Peluncuran Aplikasi Ke Private Server...{Colors.ENDC}\n")
+    time.sleep(1.5)
     
-    loop_count = 1
     try:
-        while True:
-            print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
-            print(f"{Colors.BOLD}🚀 LOOPS REJOIN #{loop_count} | {datetime.now().strftime('%H:%M:%S')}{Colors.ENDC}")
-            print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
+        print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
+        print(f"{Colors.BOLD}🚀 PROCESS LAUNCH | {datetime.now().strftime('%H:%M:%S')}{Colors.ENDC}")
+        print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
+        
+        # Proses membuka aplikasi utama & clone satu per satu tanpa loop berulang
+        for index, pkg in enumerate(installed_packages):
+            clone_delay = index * 20
             
-            for index, pkg in enumerate(installed_packages):
-                clone_delay = index * 20
-                
-                if clone_delay > 0:
-                    print(f"\n{Colors.GRAY}[+] Persiapan membuka clone ke-{index} ({pkg})...{Colors.ENDC}")
-                    countdown_timer(clone_delay, f"Jeda Kelipatan 20s untuk {pkg}")
-                
-                print(f"{Colors.OKGREEN}[✓] Membuka Aplikasi: {Colors.BOLD}{pkg}{Colors.ENDC}")
-                if force_stop_enabled:
-                    print(f"    {Colors.GRAY}[i] Force stopping {pkg} untuk pembersihan session...{Colors.ENDC}")
-                print(f"    Meluncurkan Ke Private Server via Direct Intent...")
-                
-                success = launch_app_and_rejoin(pkg, server_link, force_stop=force_stop_enabled)
-                if success:
-                    print(f"    {Colors.OKCYAN}[SUCCESS] Deep Link Private Server terkirim ke {pkg}{Colors.ENDC}")
-                else:
-                    print(f"    {Colors.FAIL}[FAILED] Gagal membuka {pkg}{Colors.ENDC}")
+            if clone_delay > 0:
+                print(f"\n{Colors.GRAY}[+] Persiapan membuka clone ke-{index} ({pkg})...{Colors.ENDC}")
+                countdown_timer(clone_delay, f"Jeda Kelipatan 20s untuk {pkg}")
             
-            print(f"\n{Colors.OKBLUE}[i] Seluruh clone telah di-rejoin.{Colors.ENDC}")
-            countdown_timer(base_duration, f"Menunggu Iterasi Loop Berikutnya (#{loop_count + 1})")
-            loop_count += 1
+            print(f"{Colors.OKGREEN}[✓] Membuka Aplikasi: {Colors.BOLD}{pkg}{Colors.ENDC}")
+            if force_stop_enabled:
+                print(f"    {Colors.GRAY}[i] Force stopping {pkg} untuk pembersihan session...{Colors.ENDC}")
+            print(f"    Meluncurkan Ke Private Server via Direct Intent...")
+            
+            success = launch_app_and_rejoin(pkg, server_link, force_stop=force_stop_enabled)
+            if success:
+                print(f"    {Colors.OKCYAN}[SUCCESS] Deep Link Private Server terkirim ke {pkg}{Colors.ENDC}")
+            else:
+                print(f"    {Colors.FAIL}[FAILED] Gagal membuka {pkg}{Colors.ENDC}")
+        
+        # Penanganan setelah semua aplikasi terbuka: hitung mundur 5 detik lalu keluar & tutup Termux
+        print(f"\n{Colors.OKGREEN}══════════════════════════════════════════════════════════════{Colors.ENDC}")
+        print(f"{Colors.OKGREEN}[✓] Seluruh aplikasi & clone ({len(installed_packages)}) telah berhasil dibuka!{Colors.ENDC}")
+        print(f"{Colors.WARNING}[i] Menutup Termux otomatis dalam waktu 5 detik...{Colors.ENDC}")
+        print(f"{Colors.OKGREEN}══════════════════════════════════════════════════════════════{Colors.ENDC}\n")
+        
+        countdown_timer(5, "Auto-Close Termux")
+        
+        print(f"\n{Colors.FAIL}[🚪] Mematikan sesi Termux... Selesai.{Colors.ENDC}")
+        time.sleep(0.5)
+        
+        # Mematikan aplikasi/sesi Termux
+        try:
+            os.system("pkill -9 -f com.termux")
+        except Exception:
+            pass
+        sys.exit(0)
 
     except KeyboardInterrupt:
-        print(f"\n\n{Colors.WARNING}[!] Rejoin Server Dihentikan oleh Pengguna.{Colors.ENDC}")
+        print(f"\n\n{Colors.WARNING}[!] Proses Dihentikan oleh Pengguna.{Colors.ENDC}")
         time.sleep(2)
 
 def show_dashboard(config, packages):

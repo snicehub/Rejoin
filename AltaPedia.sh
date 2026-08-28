@@ -10,21 +10,17 @@ else
     SU_CMD="su -c"
 fi
 
-# Fungsi untuk mendeteksi hanya aplikasi altapedia yang benar-benar terinstal
 get_installed_packages() {
     local detected=""
-    # Daftar lengkap variasi package yang akan dicek satu per satu di sistem
     local target_list="com.altapedia.liteA com.altapedia.liteB com.altapedia.liteC com.altapedia.liteD com.altapedia.liteE com.altapedia.liteF com.altapedia.liteG com.altapedia.liteH com.altapedia.liteI com.altapedia.liteJ com.altapedia.liteK com.altapedia.liteL com.altapedia.liteM com.altapedia.liteN com.altapedia.liteO"
     
     for pkg in $target_list; do
-        # Cek apakah package terinstal di sistem Android
-        local check=$($SU_CMD "pm path $pkg" 2>/dev/null)
+        local check=$($SU_CMD "pm list packages | grep '^package:$pkg$'" 2>/dev/null)
         if [ ! -z "$check" ]; then
             detected="$detected $pkg"
         fi
     done
     
-    # Hilangkan spasi berlebih di awal/akhir
     echo "$detected" | xargs
 }
 
@@ -97,7 +93,7 @@ run_auto_join() {
     done
 
     TOTAL_PKG=${#PKG_ARRAY[@]}
-    DELAY=40  # Jeda awal 40 detik dari apk 1 ke apk 2
+    DELAY=40
 
     echo ""
     echo "========================================"
@@ -113,34 +109,31 @@ run_auto_join() {
         echo -e "\033[1;36m[$idx/$TOTAL_PKG] Memproses: $pkg\033[0m"
         echo "----------------------------------------"
         
-        # 1. Hentikan aplikasi
         $SU_CMD "am force-stop $pkg" >/dev/null 2>&1
-        
-        # 2. Buka aplikasi & arahkan ke Link Private Server masing-masing
-        echo -e "\033[1;33m[*] Membuka aplikasi & masuk PS...\033[0m"
-        $SU_CMD "am start -a android.intent.action.VIEW -d '$ps_link' -p $pkg" >/dev/null 2>&1
-        echo -e "\033[1;32m[✓] Berhasil membuka $pkg.\033[0m"
+        sleep 1
 
-        # 3. Jeda waktu dinamis (40s, lalu kelipatan +20s: 60s, 80s, dst)
+        echo -e "\033[1;33m[*] Membuka aplikasi & masuk PS...\033[0m"
+        $SU_CMD "am start -W -a android.intent.action.VIEW -d '$ps_link' $pkg" >/dev/null 2>&1
+        echo -e "\033[1;32m[✓] Perintah buka $pkg dikirim.\033[0m"
+
         if [ $idx -lt $TOTAL_PKG ]; then
             echo ""
             echo -e "\033[1;35m[⏳] Menunggu jeda waktu ${DELAY} detik ke akun berikutnya...\033[0m"
             for ((t=DELAY; t>0; t--)); do
-                printf "\r\033[1;33m[⏳] Sisa waktu jeda: %2d detik... \033[0m" $t
+                printf "\r\033[1;33m[⏳] Sisa waktu jeda: %2d detik...      \033[0m" $t
                 sleep 1
             done
-            printf "\r\033[1;32m[✓] Jeda waktu selesai.                         \033[0m\n"
+            echo -e "\n\033[1;32m[✓] Jeda waktu selesai.\033[0m"
             
             DELAY=$((DELAY + 20))
         else
-            # Jeda khusus 10 detik setelah aplikasi terakhir terbuka sebelum Termux tertutup
             echo ""
             echo -e "\033[1;35m[⏳] Aplikasi terakhir selesai. Menunggu 10 detik sebelum menutup Termux...\033[0m"
             for ((t=10; t>0; t--)); do
-                printf "\r\033[1;33m[⏳] Menutup Termux dalam: %2d detik... \033[0m" $t
+                printf "\r\033[1;33m[⏳] Menutup Termux dalam: %2d detik...      \033[0m" $t
                 sleep 1
             done
-            printf "\r\033[1;32m[✓] Selesai. Menutup Termux sekarang...          \033[0m\n"
+            echo -e "\n\033[1;32m[✓] Selesai. Menutup Termux sekarang...\033[0m"
         fi
     done
 
@@ -150,7 +143,6 @@ run_auto_join() {
     echo "========================================"
     sleep 1
 
-    # Perintah otomatis menutup Termux via root
     $SU_CMD "am force-stop com.termux" >/dev/null 2>&1
     exit 0
 }
@@ -158,14 +150,12 @@ run_auto_join() {
 while true; do
     stty sane 2>/dev/null
     clear
-    # Logo warna Orange (ANSI 38;5;208)
     printf "\033[38;5;208m"
-    printf " █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗ \n"
+    printf " █████╗ ██╗  ████████╗█████╗ ██████╗ ███████╗██████╗ ██╗ █████╗ \n"
     printf "██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗\n"
     printf "███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║\n"
     printf "██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║\n"
     printf "██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║\n"
-    printf "╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝\n"
     printf "╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝\n"
     printf "\033[1;37mVersion 1.0.0\033[0m\n\n"
     echo "======================================================================="

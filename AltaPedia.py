@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-===================================================================
-    ALTAPEDIA REJOIN & AUTOMATION TOOL FOR TERMUX
-===================================================================
-    Author     : ALTAPEDIA Team
-    Key Required: ALTAPEDIA-0987-08123-SUPREME
-    Package    : com.altapedia (and clones)
-===================================================================
-"""
-
 import os
 import sys
 import time
@@ -34,8 +22,8 @@ class Colors:
 
 CONFIG_FILE = "altapedia_config.json"
 VALID_KEY = "ALTAPEDIA-0987-08123-SUPREME"
-GET_KEY_URL = "https://raw.githubusercontent.com/altapedia-official/rejoin-key/main/keys.json"
-GITHUB_CONFIG_URL = "https://raw.githubusercontent.com/altapedia-official/rejoin-key/main/announcement.txt"
+GET_KEY_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/keys.txt"
+GITHUB_CONFIG_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/README.md"
 DEFAULT_PACKAGE = "com.altapedia"
 
 def clear_screen():
@@ -55,7 +43,7 @@ def draw_banner():
     ║ ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝ ║
     ║                                                                   ║
     ║             TERMUX REJOIN SERVER & CLONE AUTOMATION               ║
-    ║                     VERSION 1.0 SUPREME                           ║
+    ║                     VERSION 3.5 SUPREME                           ║
     ╚═══════════════════════════════════════════════════════════════════╝
     """ + Colors.ENDC)
 
@@ -66,6 +54,8 @@ def load_config():
         "private_server": "",
         "base_duration": 60,
         "clone_step": 20,
+        "force_stop_before_launch": True,
+        "launch_mode": "Standard (-p)",
         "clones": []
     }
     if os.path.exists(CONFIG_FILE):
@@ -121,7 +111,6 @@ def verify_key(config):
     
     user_key = input(f"\n{Colors.BOLD}Masukkan License Key: {Colors.ENDC}").strip()
     
-    # Check key locally or attempt GitHub remote sync check
     if user_key == VALID_KEY:
         config["key"] = user_key
         save_config(config)
@@ -129,13 +118,13 @@ def verify_key(config):
         time.sleep(1.5)
         return True
     else:
-        # Attempt GitHub verification as backup check
-        print(f"{Colors.WARNING}[i] Memeriksa Key ke Server GitHub...{Colors.ENDC}")
+        print(f"{Colors.WARNING}[i] Memeriksa Key ke Server GitHub (snicehub/Rejoin)...{Colors.ENDC}")
         try:
             req = urllib.request.Request(GET_KEY_URL, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=5) as response:
-                keys_data = json.loads(response.read().decode())
-                if user_key in keys_data.get("valid_keys", []):
+                content = response.read().decode('utf-8')
+                valid_keys = [k.strip() for k in content.splitlines() if k.strip()]
+                if user_key in valid_keys or VALID_KEY in valid_keys:
                     config["key"] = user_key
                     save_config(config)
                     print(f"{Colors.OKGREEN}[✓] Key GitHub Valid! Akses Diberikan.{Colors.ENDC}")
@@ -152,7 +141,6 @@ def detect_installed_packages():
     """Detects installed instances of com.altapedia and its clones via package manager."""
     found_packages = []
     try:
-        # Run pm list packages command via shell
         result = subprocess.run(['pm', 'list', 'packages'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
             lines = result.stdout.splitlines()
@@ -161,8 +149,7 @@ def detect_installed_packages():
                 if DEFAULT_PACKAGE in pkg or 'altapedia' in pkg.lower():
                     found_packages.append(pkg)
     except Exception:
-        # Fallback simulation if running outside standard Termux ADB environment
-        found_packages = [DEFAULT_PACKAGE, f"{DEFAULT_PACKAGE}.clone1", f"{DEFAULT_PACKAGE}.clone2"]
+        found_packages = [f"{DEFAULT_PACKAGE}.liteA", f"{DEFAULT_PACKAGE}.liteB"]
     
     if not found_packages:
         found_packages = [DEFAULT_PACKAGE]
@@ -179,14 +166,12 @@ def auto_hapus_cache(packages):
     
     for pkg in packages:
         print(f" -> Membersihkan cache untuk package: {Colors.OKCYAN}{pkg}{Colors.ENDC}")
-        # Try shell pm clear command
         try:
             cmd = f"pm clear {pkg}"
             res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if "Success" in res.stdout:
                 print(f"    {Colors.OKGREEN}[✓] Cache & Data {pkg} Berhasil Dibersihkan!{Colors.ENDC}")
             else:
-                # Direct folder cache clean fallback
                 cache_dir = f"/sdcard/Android/data/{pkg}/cache"
                 subprocess.run(f"rm -rf {cache_dir}/*", shell=True)
                 print(f"    {Colors.OKGREEN}[✓] Folder Cache {pkg} Dibersihkan.{Colors.ENDC}")
@@ -221,17 +206,68 @@ def input_private_server(config):
         
     time.sleep(1.5)
 
-def launch_app_and_rejoin(package_name, server_link):
-    """Launches specified app package using Android Intent/AM manager."""
+def configure_launch_options(config):
+    """Configures force stop behavior and intent launch modes."""
+    clear_screen()
+    draw_banner()
+    print(f"{Colors.HEADER}{Colors.BOLD}=== MENU: PENGATURAN TINGKAT LANJUT ==={Colors.ENDC}\n")
+    
+    current_fs = config.get("force_stop_before_launch", True)
+    status_fs = f"{Colors.OKGREEN}AKTIF (Direkomendasikan){Colors.ENDC}" if current_fs else f"{Colors.FAIL}NONAKTIF{Colors.ENDC}"
+    
+    print(f"1. Auto Force Stop App Sebelum Rejoin : {status_fs}")
+    print(f"   (Menutup aplikasi terlebih dahulu agar link Private Server langsung terbaca)\n")
+    
+    print("PILIHAN:")
+    print(" [1] Toggle Auto Force Stop (Aktif/Nonaktif)")
+    print(" [0] Kembali ke Dashboard")
+    print()
+    
+    choice = input(f"{Colors.OKCYAN}Pilih opsi [0-1]: {Colors.ENDC}").strip()
+    if choice == "1":
+        config["force_stop_before_launch"] = not current_fs
+        save_config(config)
+        print(f"\n{Colors.OKGREEN}[✓] Pengaturan Force Stop Diperbarui!{Colors.ENDC}")
+        time.sleep(1)
+    else:
+        return
+
+def launch_app_and_rejoin(package_name, server_link, force_stop=True):
+    """
+    Launches specified app package directly into the Private Server using precise Android Intents.
+    Includes auto force-stop to clear stuck home menus and explicit package targeting (-p).
+    """
     try:
-        if server_link:
-            # Launch via deep link / intent URL
-            cmd = f"am start -a android.intent.action.VIEW -d \"{server_link}\" {package_name}"
-        else:
-            # Launch package directly
-            cmd = f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
+        # Step 1: Force Stop app if enabled so it resets from home menu state
+        if force_stop:
+            subprocess.run(f"am force-stop {package_name}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1.0)
             
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if server_link:
+            # Primary Intent Method: Target package directly with VIEW action + FLAG_ACTIVITY_NEW_TASK & CLEAR_TOP
+            cmd_primary = (
+                f'am start -a android.intent.action.VIEW '
+                f'-d "{server_link}" '
+                f'-p {package_name} '
+                f'-f 0x10000000 -f 0x04000000 '
+                f'--activity-clear-top'
+            )
+            
+            res = subprocess.run(cmd_primary, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            # Fallback Method if -p parameter is rejected on modified Android ROMs/Cloners
+            if "Error" in res.stderr or "Error" in res.stdout:
+                cmd_fallback = (
+                    f'am start -a android.intent.action.VIEW '
+                    f'-d "{server_link}" '
+                    f'-n {package_name}/com.roblox.client.ActivityProtocolLaunch '
+                    f'-f 0x10000000'
+                )
+                subprocess.run(cmd_fallback, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            cmd = f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
         return True
     except Exception as e:
         return False
@@ -259,12 +295,13 @@ def menu_rejoin_server(config, installed_packages):
         input(f"\n{Colors.GRAY}Tekan [Enter] untuk kembali...{Colors.ENDC}")
         return
 
+    force_stop_enabled = config.get("force_stop_before_launch", True)
+
     print(f"{Colors.OKCYAN}Aplikasi Terdeteksi ({len(installed_packages)}):{Colors.ENDC}")
     for idx, pkg in enumerate(installed_packages, 1):
         print(f"  {idx}. {pkg}")
     print()
     
-    # User selects delay duration
     print(f"{Colors.BOLD}Pengaturan Durasi Jeda Rejoin:{Colors.ENDC}")
     try:
         base_dur_input = input("Masukkan durasi dasar per-loop (dalam detik, default 60): ").strip()
@@ -273,11 +310,11 @@ def menu_rejoin_server(config, installed_packages):
         base_duration = 60
 
     print(f"\n{Colors.WARNING}[i] Skema kelipatan jeda clone diaktifkan:{Colors.ENDC}")
-    print(f"    - Main App        : Langsung Buka")
+    print(f"    - Main App / App 1: Langsung Buka")
     for i in range(1, len(installed_packages)):
         print(f"    - Clone #{i:<9} : +{i * 20} detik kelipatan")
         
-    print(f"\n{Colors.OKGREEN}[▶] Memulai Otomatisasi Rejoin Server... (Tekan Ctrl+C untuk Stop){Colors.ENDC}\n")
+    print(f"\n{Colors.OKGREEN}[▶] Memulai Otomatisasi Rejoin Private Server... (Tekan Ctrl+C untuk Stop){Colors.ENDC}\n")
     time.sleep(2)
     
     loop_count = 1
@@ -288,7 +325,6 @@ def menu_rejoin_server(config, installed_packages):
             print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
             
             for index, pkg in enumerate(installed_packages):
-                # Calculate delay: clone #1 = 20s, clone #2 = 40s, clone #3 = 60s, etc.
                 clone_delay = index * 20
                 
                 if clone_delay > 0:
@@ -296,11 +332,13 @@ def menu_rejoin_server(config, installed_packages):
                     countdown_timer(clone_delay, f"Jeda Kelipatan 20s untuk {pkg}")
                 
                 print(f"{Colors.OKGREEN}[✓] Membuka Aplikasi: {Colors.BOLD}{pkg}{Colors.ENDC}")
-                print(f"    Meluncurkan Ke Private Server...")
+                if force_stop_enabled:
+                    print(f"    {Colors.GRAY}[i] Force stopping {pkg} untuk pembersihan session...{Colors.ENDC}")
+                print(f"    Meluncurkan Ke Private Server via Direct Intent...")
                 
-                success = launch_app_and_rejoin(pkg, server_link)
+                success = launch_app_and_rejoin(pkg, server_link, force_stop=force_stop_enabled)
                 if success:
-                    print(f"    {Colors.OKCYAN}[SUCCESS] Command launch terkirim ke {pkg}{Colors.ENDC}")
+                    print(f"    {Colors.OKCYAN}[SUCCESS] Deep Link Private Server terkirim ke {pkg}{Colors.ENDC}")
                 else:
                     print(f"    {Colors.FAIL}[FAILED] Gagal membuka {pkg}{Colors.ENDC}")
             
@@ -321,8 +359,10 @@ def show_dashboard(config, packages):
     if not server_status:
         server_status = f"{Colors.FAIL}Belum diatur{Colors.ENDC}"
     else:
-        server_status = f"{Colors.OKGREEN}{server_status[:35]}...{Colors.ENDC}"
+        server_status = f"{Colors.OKGREEN}{server_status[:38]}...{Colors.ENDC}"
         
+    fs_status = "AKTIF" if config.get("force_stop_before_launch", True) else "NONAKTIF"
+
     print(f"{Colors.OKBLUE}══════════════════════════════════════════════════════════════{Colors.ENDC}")
     print(f"{Colors.BOLD}                       DASHBOARD STATUS                       {Colors.ENDC}")
     print(f"{Colors.OKBLUE}══════════════════════════════════════════════════════════════{Colors.ENDC}")
@@ -331,6 +371,7 @@ def show_dashboard(config, packages):
     print(f" Package Utama      : {Colors.OKCYAN}{DEFAULT_PACKAGE}{Colors.ENDC}")
     print(f" Clone Terdeteksi   : {Colors.BOLD}{len(packages)} Aplikasi{Colors.ENDC}")
     print(f" Private Server     : {server_status}")
+    print(f" Auto Force Stop    : {Colors.OKCYAN}{fs_status}{Colors.ENDC}")
     print(f" Sync Data Server   : {Colors.OKGREEN}GitHub Synced{Colors.ENDC}")
     print(f"{Colors.OKBLUE}══════════════════════════════════════════════════════════════{Colors.ENDC}\n")
 
@@ -339,7 +380,8 @@ def show_dashboard(config, packages):
     print(f" [{Colors.OKGREEN}2{Colors.ENDC}] 🧹 Auto Hapus Cache ({len(packages)} App)")
     print(f" [{Colors.OKGREEN}3{Colors.ENDC}] 🔗 Masukkan Link Private Server")
     print(f" [{Colors.OKGREEN}4{Colors.ENDC}] 🔄 Rejoin Server (Start Auto Reopen)")
-    print(f" [{Colors.OKGREEN}5{Colors.ENDC}] 🔑 Informasi Key & GitHub Sync")
+    print(f" [{Colors.OKGREEN}5{Colors.ENDC}] ⚙️ Pengaturan Advance (Force Stop Toggle)")
+    print(f" [{Colors.OKGREEN}6{Colors.ENDC}] 🔑 Informasi Key & GitHub Sync")
     print(f" [{Colors.FAIL}0{Colors.ENDC}] 🚪 Keluar Script")
     print()
 
@@ -347,17 +389,15 @@ def main():
     """Main program entry loop."""
     config = load_config()
     
-    # Force Key Verification
     if not verify_key(config):
         print(f"{Colors.FAIL}[!] Akses ditolak.{Colors.ENDC}")
         sys.exit(1)
         
     while True:
-        # Re-detect packages dynamically
         installed_packages = detect_installed_packages()
         
         show_dashboard(config, installed_packages)
-        choice = input(f"{Colors.BOLD}{Colors.OKCYAN}Pilih Menu [0-5]: {Colors.ENDC}").strip()
+        choice = input(f"{Colors.BOLD}{Colors.OKCYAN}Pilih Menu [0-6]: {Colors.ENDC}").strip()
         
         if choice == "1":
             print(f"\n{Colors.OKGREEN}[i] Memperbarui dashboard...{Colors.ENDC}")
@@ -369,11 +409,13 @@ def main():
         elif choice == "4":
             menu_rejoin_server(config, installed_packages)
         elif choice == "5":
+            configure_launch_options(config)
+        elif choice == "6":
             clear_screen()
             draw_banner()
             print(f"{Colors.HEADER}=== INFORMASI LISENSI & GITHUB DATA ==={Colors.ENDC}\n")
             print(f" Key Aktif  : {config.get('key')}")
-            print(f" GitHub Repo: https://github.com/altapedia-official/rejoin-key")
+            print(f" GitHub Repo: https://github.com/snicehub/Rejoin")
             print(f" Target Package: {DEFAULT_PACKAGE}")
             print(f"\n{Colors.GRAY}Catatan: Data konfigurasi tersimpan otomatis di local storage Termux.{Colors.ENDC}")
             input(f"\nTekan [Enter] untuk kembali ke Dashboard...")

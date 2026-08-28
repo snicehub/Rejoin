@@ -23,6 +23,9 @@ KEY_FILE = "altapedia_key.txt"
 # URL Raw GitHub berisi daftar kunci yang valid (Sesuaikan jika perlu)
 ONLINE_KEY_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/keys.txt"
 
+# URL Google Spreadsheet (Format Published CSV) untuk Verifikasi Key
+GSHEET_KEY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_YOUR_SPREADSHEET_ID_HERE/pub?output=csv"
+
 # URL yang dibuka saat user memilih opsi "1. Ambil Key"
 GET_KEY_URL = "https://github.com/snicehub/Rejoin"
 
@@ -34,6 +37,7 @@ default_config = {
     "detected_packages": [],
     "duration_seconds": 20,
     "github_repo": "https://github.com/snicehub/Rejoin",
+    "gsheet_url": GSHEET_KEY_URL,
     "last_sync": "Belum pernah"
 }
 
@@ -77,7 +81,25 @@ def save_config(config):
         print(f"{COLOR_RED}[X] Gagal menyimpan konfigurasi: {e}{COLOR_RESET}")
 
 def fetch_online_keys():
-    """Mengunduh daftar key valid dari server GitHub secara online."""
+    """Mengunduh daftar key valid dari Google Spreadsheet & Server GitHub."""
+    keys = []
+    
+    # 1. Coba ambil dari Google Spreadsheet (CSV)
+    try:
+        req = urllib.request.Request(GSHEET_KEY_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            content = response.read().decode('utf-8')
+            for line in content.splitlines():
+                # Bersihkan karakter CSV quote dan whitespace
+                cleaned_key = line.replace('"', '').replace("'", '').strip()
+                if cleaned_key:
+                    keys.append(cleaned_key)
+            if keys:
+                return keys
+    except Exception:
+        pass
+
+    # 2. Fallback: Coba ambil dari GitHub jika Google Sheets gagal
     try:
         req = urllib.request.Request(ONLINE_KEY_URL, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -298,14 +320,15 @@ def run_rejoin_server(config):
             print(f"{COLOR_CYAN}    -> Timer Activation: {staggered_delay}s (Interval #{idx}){COLOR_RESET}")
 
             try:
-                subprocess.run(["am", "start", "-a", "android.intent.action.VIEW", "-d", server_url, pkg],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["termux-open-url", server_url],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                # Mengirim intent link private server LANGSUNG ke package clone spesifik dengan -p
+                subprocess.run(
+                    ["am", "start", "-a", "android.intent.action.VIEW", "-d", server_url, "-p", pkg],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
             except Exception:
                 pass
 
-            print(f"{COLOR_GREEN}    [✓] Rejoin signal sent to {pkg}!{COLOR_RESET}")
+            print(f"{COLOR_GREEN}    [✓] Rejoin signal sent directly to package {pkg}!{COLOR_RESET}")
             
             for t in range(interval, 0, -1):
                 sys.stdout.write(f"\r        Sisa Waktu Jeda: {t}s ")

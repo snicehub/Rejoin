@@ -20,7 +20,7 @@ COLOR_WHITE = "\033[37m"
 CONFIG_FILE = "altapedia_config.json"
 KEY_FILE = "altapedia_key.txt"
 
-# URL Raw GitHub berisi daftar kunci yang valid (Sesuaikan jika perlu)
+# URL Raw GitHub berisi daftar kunci yang valid
 ONLINE_KEY_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/keys.txt"
 
 # URL Google Spreadsheet (Format Published CSV) untuk Verifikasi Key
@@ -90,7 +90,6 @@ def fetch_online_keys():
         with urllib.request.urlopen(req, timeout=5) as response:
             content = response.read().decode('utf-8')
             for line in content.splitlines():
-                # Bersihkan karakter CSV quote dan whitespace
                 cleaned_key = line.replace('"', '').replace("'", '').strip()
                 if cleaned_key:
                     keys.append(cleaned_key)
@@ -110,14 +109,12 @@ def fetch_online_keys():
         return None
 
 def verify_key_online(input_key):
-    """Memeriksa apakah key yang diinput ada di database online GitHub."""
+    """Memeriksa apakah key yang diinput ada di database online."""
     online_keys = fetch_online_keys()
     
-    # Jika koneksi ke server berhasil
     if online_keys is not None:
         return input_key in online_keys
     
-    # Fallback Offline Check jika tidak ada koneksi internet (Format Dasar)
     return input_key.startswith(VALID_KEY_PREFIX) and len(input_key) >= 18
 
 def check_saved_key():
@@ -155,7 +152,7 @@ def key_system_menu():
             input(f"\n{COLOR_MAGENTA}Tekan Enter setelah mendapatkan Key...{COLOR_RESET}")
         elif choice == '2':
             user_key = input(f"\n{COLOR_CYAN}Masukkan Key Akses Anda: {COLOR_RESET}").strip()
-            print(f"{COLOR_YELLOW}[~] Memverifikasi Key ke Server GitHub...{COLOR_RESET}")
+            print(f"{COLOR_YELLOW}[~] Memverifikasi Key ke Server...{COLOR_RESET}")
             
             if verify_key_online(user_key):
                 with open(KEY_FILE, 'w') as f:
@@ -165,7 +162,6 @@ def key_system_menu():
                 break
             else:
                 print(f"\n{COLOR_RED}[X] Key tidak terdaftar atau salah!{COLOR_RESET}")
-                print(f"{COLOR_YELLOW}    Pastikan Key sesuai di file keys.txt di GitHub.{COLOR_RESET}")
                 time.sleep(2.5)
         elif choice == '0':
             print(f"\n{COLOR_YELLOW}Terima kasih telah menggunakan ALTAPEDIA.{COLOR_RESET}")
@@ -185,7 +181,7 @@ def auto_detect_altapedia():
                 if "com.altapedia" in pkg:
                     found_packages.append(pkg)
     except Exception:
-        found_packages = ["com.altapedia", "com.altapedia.clone1", "com.altapedia.clone2"]
+        found_packages = ["com.altapedia", "com.altapedia.liteB"]
 
     if not found_packages:
         found_packages = ["com.altapedia"]
@@ -213,7 +209,7 @@ def auto_clear_cache(packages):
             if result.returncode == 0:
                 print(f"{COLOR_GREEN}    [✓] Cache & data {pkg} berhasil dibersihkan.{COLOR_RESET}")
             else:
-                print(f"{COLOR_CYAN}    [i] Simulasi pembersihan cache selesai.{COLOR_RESET}")
+                print(f"{COLOR_CYAN}    [i] Pembersihan cache disimulasikan.{COLOR_RESET}")
         except Exception:
             print(f"{COLOR_CYAN}    [i] Pembersihan cache disimulasikan.{COLOR_RESET}")
         time.sleep(0.5)
@@ -286,8 +282,41 @@ def sync_github_data(config):
     print(f"{COLOR_GREEN}[✓] Waktu: {now_str}{COLOR_RESET}")
     input("\nTekan Enter untuk kembali ke Menu Utama...")
 
+def send_deep_link_intent(pkg, server_url):
+    """
+    Mengirim intent khusus Android agar clone app dipaksa 
+    langsung masuk ke dalam map/private server tanpa tertahan di Beranda.
+    """
+    # 1. Intent Standar dengan Package Direct Target
+    cmd1 = [
+        "am", "start",
+        "-a", "android.intent.action.VIEW",
+        "-d", server_url,
+        "-p", pkg,
+        "--activity-clear-top",
+        "--activity-new-task"
+    ]
+    subprocess.run(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # 2. Intent Khusus ke Component Launch Activity Roblox Clone
+    activities = [
+        f"{pkg}/com.roblox.client.ActivityProtocolLaunchActivity",
+        f"{pkg}/com.roblox.client.RobloxActivity"
+    ]
+    
+    for act in activities:
+        cmd2 = [
+            "am", "start",
+            "-a", "android.intent.action.VIEW",
+            "-d", server_url,
+            "-n", act,
+            "--activity-clear-top",
+            "--activity-new-task"
+        ]
+        subprocess.run(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 def run_rejoin_server(config):
-    """Menjalankan Rejoin Server otomatis."""
+    """Menjalankan Rejoin Server otomatis dengan perbaikan multi-clone deep link."""
     print_banner()
     print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== EXECUTE REJOIN PRIVATE SERVER ==={COLOR_RESET}\n")
     
@@ -316,27 +345,32 @@ def run_rejoin_server(config):
         for idx, pkg in enumerate(packages, start=1):
             staggered_delay = interval * idx
             print(f"{COLOR_GREEN}[+] [{idx}/{len(packages)}] Opening Package: {pkg}{COLOR_RESET}")
-            print(f"{COLOR_YELLOW}    -> Joining: {server_url}{COLOR_RESET}")
+            print(f"{COLOR_YELLOW}    -> Joining Target: {server_url}{COLOR_RESET}")
             print(f"{COLOR_CYAN}    -> Timer Activation: {staggered_delay}s (Interval #{idx}){COLOR_RESET}")
 
-            try:
-                # Mengirim intent link private server LANGSUNG ke package clone spesifik dengan -p
-                subprocess.run(
-                    ["am", "start", "-a", "android.intent.action.VIEW", "-d", server_url, "-p", pkg],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                )
-            except Exception:
-                pass
-
-            print(f"{COLOR_GREEN}    [✓] Rejoin signal sent directly to package {pkg}!{COLOR_RESET}")
+            # Peluncuran Pertama (Inisialisasi Clone App)
+            send_deep_link_intent(pkg, server_url)
+            print(f"{COLOR_GREEN}    [✓] Signal awal terkirim ke {pkg}...{COLOR_RESET}")
             
-            for t in range(interval, 0, -1):
+            # Re-Push Intent (Pemicu ke-2 setelah 4 detik untuk memaksa clone 2+ masuk map jika stuck di Home)
+            if idx > 1:
+                print(f"{COLOR_YELLOW}    [~] Memicu Re-Push Intent (Auto-Teleport ke Map)...{COLOR_RESET}")
+                time.sleep(4)
+                send_deep_link_intent(pkg, server_url)
+                print(f"{COLOR_GREEN}    [✓] Deep Link berhasil didorong ulang ke {pkg}!{COLOR_RESET}")
+            
+            # Hitung Mundur Sisa Waktu Jeda
+            remaining_time = interval - (4 if idx > 1 else 0)
+            if remaining_time < 1:
+                remaining_time = 1
+
+            for t in range(remaining_time, 0, -1):
                 sys.stdout.write(f"\r        Sisa Waktu Jeda: {t}s ")
                 sys.stdout.flush()
                 time.sleep(1)
             print("\r        [✓] Interval Selesai!                    \n")
 
-        print(f"{COLOR_GREEN}{COLOR_BOLD}[✓] SEMUA CLONE ALTAPEDIA BERHASIL REJOIN!{COLOR_RESET}")
+        print(f"{COLOR_GREEN}{COLOR_BOLD}[✓] SEMUA CLONE ALTAPEDIA BERHASIL REJOIN KE MAP!{COLOR_RESET}")
     except KeyboardInterrupt:
         print(f"\n\n{COLOR_RED}[!] Rejoin Server dihentikan.{COLOR_RESET}")
 

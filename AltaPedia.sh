@@ -15,8 +15,7 @@ get_installed_packages() {
     local target_list="com.altapedia.liteA com.altapedia.liteB com.altapedia.liteC com.altapedia.liteD com.altapedia.liteE com.altapedia.liteF com.altapedia.liteG com.altapedia.liteH com.altapedia.liteI com.altapedia.liteJ com.altapedia.liteK com.altapedia.liteL com.altapedia.liteM com.altapedia.liteN com.altapedia.liteO"
     
     for pkg in $target_list; do
-        local check=$($SU_CMD "pm list packages | grep '^package:$pkg$'" 2>/dev/null)
-        if [ ! -z "$check" ]; then
+        if $SU_CMD "[ -d /data/data/$pkg ] || [ -d /data/app/$pkg* ]" 2>/dev/null; then
             detected="$detected $pkg"
         fi
     done
@@ -109,13 +108,21 @@ run_auto_join() {
         echo -e "\033[1;36m[$idx/$TOTAL_PKG] Memproses: $pkg\033[0m"
         echo "----------------------------------------"
         
+        # 1. Hentikan aplikasi agar bersih saat dibuka ulang
         $SU_CMD "am force-stop $pkg" >/dev/null 2>&1
         sleep 1
 
+        # 2. Buka aplikasi dan paksa masuk ke Private Server
         echo -e "\033[1;33m[*] Membuka aplikasi & masuk PS...\033[0m"
-        $SU_CMD "am start -W -a android.intent.action.VIEW -d '$ps_link' $pkg" >/dev/null 2>&1
+        $SU_CMD "am start -n $pkg/com.roblox.client.Activity -a android.intent.action.VIEW -d '$ps_link'" >/dev/null 2>&1
+        
+        if [ $? -ne 0 ]; then
+            $SU_CMD "am start -a android.intent.action.VIEW -d '$ps_link' -p $pkg" >/dev/null 2>&1
+        fi
+        
         echo -e "\033[1;32m[✓] Perintah buka $pkg dikirim.\033[0m"
 
+        # 3. Hitung mundur jeda waktu
         if [ $idx -lt $TOTAL_PKG ]; then
             echo ""
             echo -e "\033[1;35m[⏳] Menunggu jeda waktu ${DELAY} detik ke akun berikutnya...\033[0m"

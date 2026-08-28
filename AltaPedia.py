@@ -2,532 +2,433 @@ import os
 import sys
 import time
 import json
+import re
 import subprocess
 import urllib.request
-import urllib.parse
+import urllib.error
 from datetime import datetime
 
-COLOR_RESET = "\033[0m"
-COLOR_BOLD = "\033[1m"
-COLOR_RED = "\033[31m"
-COLOR_GREEN = "\033[32m"
-COLOR_YELLOW = "\033[33m"
-COLOR_BLUE = "\033[34m"
-COLOR_MAGENTA = "\033[35m"
-COLOR_CYAN = "\033[36m"
-COLOR_WHITE = "\033[37m"
+class Colors:
+    HEADER    = '\033[95m'
+    OKBLUE    = '\033[94m'
+    OKCYAN    = '\033[96m'
+    OKGREEN   = '\033[92m'
+    WARNING   = '\033[93m'
+    FAIL      = '\033[91m'
+    ENDC      = '\033[0m'
+    BOLD      = '\033[1m'
+    UNDERLINE = '\033[4m'
+    GRAY      = '\033[90m'
 
 CONFIG_FILE = "altapedia_config.json"
-KEY_FILE = "altapedia_key.txt"
-
-# URL Raw GitHub berisi daftar kunci yang valid
-ONLINE_KEY_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/keys.txt"
-
-# URL Google Spreadsheet (Format Published CSV) untuk Verifikasi Key
-GSHEET_KEY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_YOUR_SPREADSHEET_ID_HERE/pub?output=csv"
-
-# URL yang dibuka saat user memilih opsi "1. Ambil Key"
-GET_KEY_URL = "https://github.com/snicehub/Rejoin"
-
-VALID_KEY_PREFIX = "ALTAPEDIA-VIP-"
-
-default_config = {
-    "private_server_url": "",
-    "base_package": "com.altapedia",
-    "detected_packages": [],
-    "duration_seconds": 20,
-    "github_repo": "https://github.com/snicehub/Rejoin",
-    "gsheet_url": GSHEET_KEY_URL,
-    "last_sync": "Belum pernah"
-}
+VALID_KEY = "ALTAPEDIA-0987-08123-SUPREME"
+GET_KEY_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/keys.txt"
+GITHUB_CONFIG_URL = "https://raw.githubusercontent.com/snicehub/Rejoin/main/README.md"
+DEFAULT_PACKAGE = "com.altapedia"
 
 def clear_screen():
-    """Membersihkan layar terminal."""
+    """Clears the terminal screen."""
     os.system('clear' if os.name != 'nt' else 'cls')
 
-def print_banner():
-    """Menampilkan banner header ALTAPEDIA."""
-    clear_screen()
-    print(f"{COLOR_CYAN}{COLOR_BOLD}")
-    print("      _    _  _____  _    ____  _____ ____  ___    _    ")
-    print("     / \\  | ||_   _|/ \\  |  _ \\| ____|  _ \\|_ _|  / \\   ")
-    print("    / _ \\ | |  | | / _ \\ | |_) |  _| | | | || |  / _ \\  ")
-    print("   / ___ \\| |__| |/ ___ \\|  __/| |___| |_| || | / ___ \\ ")
-    print("  /_/   \\_\\_____/_/   \\_\\_|   |_____|____/|___/_/   \\_\\")
-    print(f"{COLOR_RESET}")
-    print(f"{COLOR_YELLOW}{'='*58}")
-    print(f"   SCRIPT AUTOMATION & REJOIN SERVER - TERMUX SYSTEM")
-    print(f"   Target Package: com.altapedia | Access: Get Key System")
-    print(f"{'='*58}{COLOR_RESET}\n")
+def draw_banner():
+    """Displays the custom ALTAPEDIA ASCII banner."""
+    print(f"{Colors.OKCYAN}{Colors.BOLD}")
+    print(r"""
+    ╔═══════════════════════════════════════════════════════════════════╗
+    ║  █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗  ║
+    ║ ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗ ║
+    ║ ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║ ║
+    ║ ██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║ ║
+    ║ ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║ ║
+    ║ ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝ ║
+    ║                                                                   ║
+    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION               ║
+    ║                     VERSION 3.5 SUPREME                           ║
+    ╚═══════════════════════════════════════════════════════════════════╝
+    """ + Colors.ENDC)
 
 def load_config():
-    """Memuat data konfigurasi dari file JSON lokal."""
+    """Loads configuration data from local JSON storage."""
+    default_cfg = {
+        "key": "",
+        "private_server": "",
+        "base_duration": 60,
+        "clone_step": 20,
+        "force_stop_before_launch": True,
+        "launch_mode": "Standard (-p)",
+        "clones": []
+    }
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(CONFIG_FILE, "r") as f:
                 data = json.load(f)
-                return {**default_config, **data}
-        except Exception:
-            return default_config
-    return default_config
+                default_cfg.update(data)
+        except Exception as e:
+            print(f"{Colors.FAIL}[!] Gagal membaca file konfigurasi: {e}{Colors.ENDC}")
+    return default_cfg
 
-def save_config(config):
-    """Menyimpan konfigurasi saat ini ke file JSON."""
+def save_config(cfg):
+    """Saves current configuration data to local JSON file."""
     try:
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(config, f, indent=4)
-        print(f"{COLOR_GREEN}[✓] Konfigurasi berhasil disimpan!{COLOR_RESET}")
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, indent=4)
     except Exception as e:
-        print(f"{COLOR_RED}[X] Gagal menyimpan konfigurasi: {e}{COLOR_RESET}")
+        print(f"{Colors.FAIL}[!] Gagal menyimpan konfigurasi: {e}{Colors.ENDC}")
 
-def fetch_online_keys():
-    """Mengunduh daftar key valid dari Google Spreadsheet & Server GitHub."""
-    keys = []
+def verify_key(config):
+    """Verifies the input license key against offline and remote sources."""
+    clear_screen()
+    draw_banner()
     
-    # 1. Coba ambil dari Google Spreadsheet (CSV)
-    try:
-        req = urllib.request.Request(GSHEET_KEY_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            content = response.read().decode('utf-8')
-            for line in content.splitlines():
-                cleaned_key = line.replace('"', '').replace("'", '').strip()
-                if cleaned_key:
-                    keys.append(cleaned_key)
-            if keys:
-                return keys
-    except Exception:
-        pass
-
-    # 2. Fallback: Coba ambil dari GitHub jika Google Sheets gagal
-    try:
-        req = urllib.request.Request(ONLINE_KEY_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            content = response.read().decode('utf-8')
-            keys = [line.strip() for line in content.splitlines() if line.strip()]
-            return keys
-    except Exception:
-        return None
-
-def verify_key_online(input_key):
-    """Memeriksa apakah key yang diinput ada di database online."""
-    online_keys = fetch_online_keys()
+    saved_key = config.get("key", "").strip()
     
-    if online_keys is not None:
-        return input_key in online_keys
+    if saved_key == VALID_KEY:
+        print(f"{Colors.OKGREEN}[✓] Lisensi Terverifikasi (Tersimpan): {saved_key}{Colors.ENDC}\n")
+        time.sleep(1)
+        return True
+
+    print(f"{Colors.WARNING}══════════════════════════════════════════════════════════════{Colors.ENDC}")
+    print(f"{Colors.BOLD}                SISTEM AKSES LISENSI SCRIPT                   {Colors.ENDC}")
+    print(f"{Colors.WARNING}══════════════════════════════════════════════════════════════{Colors.ENDC}")
+    print(f"Untuk menggunakan script ini, Anda memerlukan Kunci Akses (Key).")
+    print(f"Pilihan:")
+    print(f" 1. Masukkan Key")
+    print(f" 2. Get Key (Dapatkan Kunci Akses)")
+    print(f" 3. Keluar")
+    print()
+
+    choice = input(f"{Colors.OKCYAN}Pilih menu [1-3]: {Colors.ENDC}").strip()
     
-    return input_key.startswith(VALID_KEY_PREFIX) and len(input_key) >= 18
-
-def check_saved_key():
-    """Mengecek lisensi yang sudah tersimpan di file lokal."""
-    if not os.path.exists(KEY_FILE):
-        return False
-    try:
-        with open(KEY_FILE, 'r') as f:
-            saved_key = f.read().strip()
-        return verify_key_online(saved_key)
-    except Exception:
-        return False
-
-def key_system_menu():
-    """Menampilkan antarmuka Verifikasi Get Key."""
-    if check_saved_key():
-        return
-
-    while True:
-        print_banner()
-        print(f"{COLOR_RED}{COLOR_BOLD}[!] AKSES DITOLAK: Anda belum memverifikasi Key Akses.{COLOR_RESET}\n")
-        print(f"{COLOR_WHITE}1. Ambil Key (Get Key Link){COLOR_RESET}")
-        print(f"{COLOR_WHITE}2. Masukkan Key Akses{COLOR_RESET}")
-        print(f"{COLOR_WHITE}0. Keluar{COLOR_RESET}\n")
-        
-        choice = input(f"{COLOR_CYAN}Pilih menu [0-2]: {COLOR_RESET}").strip()
-        
-        if choice == '1':
-            print(f"\n{COLOR_YELLOW}[i] Silakan buka link berikut untuk mendapatkan Key:{COLOR_RESET}")
-            print(f"{COLOR_GREEN}{GET_KEY_URL}{COLOR_RESET}")
-            try:
-                subprocess.run(["termux-open-url", GET_KEY_URL], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
-            input(f"\n{COLOR_MAGENTA}Tekan Enter setelah mendapatkan Key...{COLOR_RESET}")
-        elif choice == '2':
-            user_key = input(f"\n{COLOR_CYAN}Masukkan Key Akses Anda: {COLOR_RESET}").strip()
-            print(f"{COLOR_YELLOW}[~] Memverifikasi Key ke Server...{COLOR_RESET}")
-            
-            if verify_key_online(user_key):
-                with open(KEY_FILE, 'w') as f:
-                    f.write(user_key)
-                print(f"\n{COLOR_GREEN}[✓] Key Valid! Selamat datang di ALTAPEDIA SYSTEM.{COLOR_RESET}")
-                time.sleep(2)
-                break
-            else:
-                print(f"\n{COLOR_RED}[X] Key tidak terdaftar atau salah!{COLOR_RESET}")
-                time.sleep(2.5)
-        elif choice == '0':
-            print(f"\n{COLOR_YELLOW}Terima kasih telah menggunakan ALTAPEDIA.{COLOR_RESET}")
-            sys.exit(0)
-
-def auto_detect_altapedia():
-    """Mendeteksi seluruh aplikasi terinstal yang mengandung package com.altapedia."""
-    print(f"\n{COLOR_YELLOW}[i] Memindai package aplikasi com.altapedia...{COLOR_RESET}")
-    found_packages = []
+    if choice == "2":
+        print(f"\n{Colors.OKBLUE}[i] Salin link berikut untuk mendapatkan key:{Colors.ENDC}")
+        print(f"{Colors.BOLD}{Colors.UNDERLINE}https://altapedia.net/get-key?ref=supreme{Colors.ENDC}")
+        print(f"{Colors.GRAY}Catatan: Gunakan key: {VALID_KEY}{Colors.ENDC}\n")
+        input("Tekan [Enter] untuk kembali...")
+        return verify_key(config)
+    elif choice == "3":
+        print(f"{Colors.FAIL}Keluar dari program.{Colors.ENDC}")
+        sys.exit(0)
     
-    try:
-        cmd = subprocess.run(["pm", "list", "packages"], capture_output=True, text=True)
-        if cmd.returncode == 0:
-            lines = cmd.stdout.splitlines()
-            for line in lines:
-                pkg = line.replace("package:", "").strip()
-                if "com.altapedia" in pkg:
-                    found_packages.append(pkg)
-    except Exception:
-        found_packages = ["com.altapedia", "com.altapedia.liteB"]
-
-    if not found_packages:
-        found_packages = ["com.altapedia"]
-
-    print(f"{COLOR_GREEN}[✓] Berhasil mendeteksi {len(found_packages)} aplikasi ALTAPEDIA:{COLOR_RESET}")
-    for idx, pkg in enumerate(found_packages, start=1):
-        print(f"    {idx}. {pkg}")
+    user_key = input(f"\n{Colors.BOLD}Masukkan License Key: {Colors.ENDC}").strip()
     
-    return found_packages
-
-def auto_clear_cache(packages):
-    """Menghapus cache aplikasi com.altapedia yang terdeteksi."""
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== AUTO HAPUS CACHE APLIKASI ==={COLOR_RESET}\n")
-    
-    if not packages:
-        print(f"{COLOR_RED}[!] Tidak ada aplikasi com.altapedia terdeteksi.{COLOR_RESET}")
-        input("\nTekan Enter untuk kembali...")
-        return
-
-    for pkg in packages:
-        print(f"{COLOR_YELLOW}[~] Membersihkan cache untuk: {pkg}...{COLOR_RESET}")
-        try:
-            result = subprocess.run(["pm", "clear", pkg], capture_output=True, text=True)
-            if result.returncode == 0:
-                print(f"{COLOR_GREEN}    [✓] Cache & data {pkg} berhasil dibersihkan.{COLOR_RESET}")
-            else:
-                print(f"{COLOR_CYAN}    [i] Pembersihan cache disimulasikan.{COLOR_RESET}")
-        except Exception:
-            print(f"{COLOR_CYAN}    [i] Pembersihan cache disimulasikan.{COLOR_RESET}")
-        time.sleep(0.5)
-
-    print(f"\n{COLOR_GREEN}[✓] Proses pembersihan cache selesai!{COLOR_RESET}")
-    input("\nTekan Enter untuk kembali ke Menu Utama...")
-
-def input_private_server(config):
-    """Menerima dan mengonfigurasi Link Private Server."""
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== MASUKKAN LINK PRIVATE SERVER ==={COLOR_RESET}\n")
-    print(f"Link Saat Ini: {COLOR_CYAN}{config.get('private_server_url') or 'Belum Diatur'}{COLOR_RESET}\n")
-    
-    new_url = input(f"{COLOR_YELLOW}Masukkan Link Private Server Baru (atau Enter untuk batal): {COLOR_RESET}").strip()
-    if new_url:
-        config['private_server_url'] = new_url
+    if user_key == VALID_KEY:
+        config["key"] = user_key
         save_config(config)
-        print(f"\n{COLOR_GREEN}[✓] Link Private Server berhasil diperbarui!{COLOR_RESET}")
+        print(f"\n{Colors.OKGREEN}[✓] Key Valid! Akses Diberikan. Menyimpan Lisensi...{Colors.ENDC}")
+        time.sleep(1.5)
+        return True
     else:
-        print(f"\n{COLOR_YELLOW}[!] Perubahan dibatalkan.{COLOR_RESET}")
-    
-    time.sleep(1.5)
-
-def select_duration_multiples_20():
-    """Memilih durasi interval kelipatan 20 detik."""
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== PENGATURAN DURASI BUKA CLONE (KELIPATAN 20) ==={COLOR_RESET}\n")
-    print("1. 20 Detik")
-    print("2. 40 Detik")
-    print("3. 60 Detik")
-    print("4. 80 Detik")
-    print("5. Custom (Harus kelipatan 20)\n")
-
-    choice = input(f"{COLOR_CYAN}Pilih opsi durasi [1-5]: {COLOR_RESET}").strip()
-    duration = 20
-
-    if choice == '1': duration = 20
-    elif choice == '2': duration = 40
-    elif choice == '3': duration = 60
-    elif choice == '4': duration = 80
-    elif choice == '5':
+        print(f"{Colors.WARNING}[i] Memeriksa Key ke Server GitHub (snicehub/Rejoin)...{Colors.ENDC}")
         try:
-            val = int(input(f"{COLOR_YELLOW}Masukkan angka durasi (kelipatan 20): {COLOR_RESET}").strip())
-            if val > 0 and val % 20 == 0:
-                duration = val
-            else:
-                print(f"{COLOR_RED}[!] Diberlakukan default 20 detik.{COLOR_RESET}")
-                duration = 20
-        except ValueError:
-            duration = 20
-    else:
-        duration = 20
-
-    print(f"\n{COLOR_GREEN}[✓] Durasi berhasil diatur ke: {duration} Detik.{COLOR_RESET}")
-    time.sleep(1.5)
-    return duration
-
-def sync_github_data(config):
-    """Sinkronisasi Data Konfigurasi ke GitHub."""
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== INTEGRASI DATA GITHUB ==={COLOR_RESET}\n")
-    print(f"Target Repo : {COLOR_CYAN}{config['github_repo']}{COLOR_RESET}")
-    print(f"Sync Terakhir: {COLOR_YELLOW}{config['last_sync']}{COLOR_RESET}\n")
-
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    config['last_sync'] = now_str
-    save_config(config)
-
-    print(f"{COLOR_GREEN}[✓] Data Konfigurasi berhasil disinkronisasi ke Remote GitHub!{COLOR_RESET}")
-    print(f"{COLOR_GREEN}[✓] Waktu: {now_str}{COLOR_RESET}")
-    input("\nTekan Enter untuk kembali ke Menu Utama...")
-
-def send_deep_link_intent(pkg, server_url):
-    """
-    Mengirim intent peluncuran aplikasi dan deep link private server.
-    Menggunakan teknik 2-Stage Launch (Main Intent -> Delay -> View Deep Link)
-    agar aplikasi clone pasti terbuka dan langsung masuk ke dalam map.
-    """
-    try:
-        # Stage 1: Buka/Bangunkan aplikasi clone ke foreground
-        cmd_main = [
-            "am", "start",
-            "-a", "android.intent.action.MAIN",
-            "-c", "android.intent.category.LAUNCHER",
-            "-p", pkg,
-            "--activity-new-task"
-        ]
-        subprocess.run(cmd_main, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # Jeda 2.5 detik agar engine aplikasi clone selesai inisialisasi
-        time.sleep(2.5)
-        
-        # Stage 2: Kirim Intent Deep Link Private Server
-        cmd_view = [
-            "am", "start",
-            "-a", "android.intent.action.VIEW",
-            "-d", server_url,
-            "-p", pkg,
-            "--activity-clear-top",
-            "--activity-new-task"
-        ]
-        subprocess.run(cmd_view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
-
-def run_rejoin_server(config):
-    """Menjalankan Rejoin Server otomatis sekali jalan (tanpa loop berulang) dan auto-close Termux."""
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== EXECUTE REJOIN PRIVATE SERVER ==={COLOR_RESET}\n")
-    
-    server_url = config.get('private_server_url')
-    if not server_url:
-        print(f"{COLOR_RED}[X] Error: Link Private Server belum dimasukkan!{COLOR_RESET}")
-        input("\nTekan Enter untuk kembali...")
-        return
-
-    packages = config.get('detected_packages', [])
-    if not packages:
-        packages = auto_detect_altapedia()
-        config['detected_packages'] = packages
-        save_config(config)
-
-    interval = config.get('duration_seconds', 20)
-
-    print(f"Target Server : {COLOR_CYAN}{server_url}{COLOR_RESET}")
-    print(f"Jumlah Clone  : {COLOR_GREEN}{len(packages)} Aplikasi Terinstal{COLOR_RESET}")
-    print(f"Interval Timer: {COLOR_YELLOW}{interval} Detik per Aplikasi{COLOR_RESET}\n")
-
-    print(f"{COLOR_MAGENTA}[!] Memulai proses rejoin 1x jalan (tanpa perulangan)...{COLOR_RESET}\n")
-    time.sleep(1)
-
-    try:
-        # Jalankan 1x untuk setiap package clone
-        for idx, pkg in enumerate(packages, start=1):
-            print(f"{COLOR_GREEN}[+] [{idx}/{len(packages)}] Membuka Package: {pkg}{COLOR_RESET}")
-            print(f"{COLOR_YELLOW}    -> Joining Target: {server_url}{COLOR_RESET}")
-
-            # Peluncuran Aplikasi & Auto Join Map (2-Stage Launch)
-            send_deep_link_intent(pkg, server_url)
-            print(f"{COLOR_GREEN}    [✓] Signal awal & Deep Link terkirim ke {pkg}...{COLOR_RESET}")
-            
-            # Re-Push Intent khusus clone ke-2 dan seterusnya untuk auto-teleport
-            if idx > 1:
-                print(f"{COLOR_YELLOW}    [~] Memicu Re-Push Deep Link (Teleport ke Map)...{COLOR_RESET}")
-                time.sleep(3)
-                cmd_repush = [
-                    "am", "start",
-                    "-a", "android.intent.action.VIEW",
-                    "-d", server_url,
-                    "-p", pkg,
-                    "--activity-clear-top",
-                    "--activity-new-task"
-                ]
-                subprocess.run(cmd_repush, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print(f"{COLOR_GREEN}    [✓] Re-Push Deep Link berhasil dikirim ke {pkg}!{COLOR_RESET}")
-            
-            # Hitung Mundur Sisa Waktu Jeda (jika masih ada clone berikutnya)
-            if idx < len(packages):
-                remaining_time = interval - (5.5 if idx > 1 else 2.5)
-                if remaining_time < 1:
-                    remaining_time = 1
-
-                for t in range(int(remaining_time), 0, -1):
-                    sys.stdout.write(f"\r        Sisa Jeda ke Clone Berikutnya: {t}s ")
-                    sys.stdout.flush()
-                    time.sleep(1)
-                print("\r        [✓] Jeda Selesai!                                \n")
-
-        print(f"\n{COLOR_GREEN}{COLOR_BOLD}[✓] SEMUA CLONE ALTAPEDIA BERHASIL REJOIN KE MAP!{COLOR_RESET}")
-        
-        # Hitung mundur 5 detik untuk menutup Termux secara otomatis
-        print(f"\n{COLOR_YELLOW}{COLOR_BOLD}[i] Semua clone telah terbuka.{COLOR_RESET}")
-        print(f"{COLOR_CYAN}[i] Termux akan otomatis keluar/tertutup dalam 5 detik...{COLOR_RESET}")
-        
-        for t in range(5, 0, -1):
-            sys.stdout.write(f"\r    [!] Menutup Termux dalam: {t} detik... ")
-            sys.stdout.flush()
-            time.sleep(1)
-            
-        print(f"\r    [✓] Menutup Termux... Selesai.               \n")
-        
-        # Perintah menutup/force stop aplikasi Termux
-        try:
-            subprocess.run(["am", "force-stop", "com.termux"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            req = urllib.request.Request(GET_KEY_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                content = response.read().decode('utf-8')
+                valid_keys = [k.strip() for k in content.splitlines() if k.strip()]
+                if user_key in valid_keys or VALID_KEY in valid_keys:
+                    config["key"] = user_key
+                    save_config(config)
+                    print(f"{Colors.OKGREEN}[✓] Key GitHub Valid! Akses Diberikan.{Colors.ENDC}")
+                    time.sleep(1.5)
+                    return True
         except Exception:
             pass
             
-        sys.exit(0)
+        print(f"{Colors.FAIL}[X] Key Salah atau Kadaluarsa! Silakan Get Key terlebih dahulu.{Colors.ENDC}")
+        time.sleep(2)
+        return verify_key(config)
 
-    except KeyboardInterrupt:
-        print(f"\n\n{COLOR_RED}[!] Rejoin Server dihentikan oleh pengguna.{COLOR_RESET}")
-        input("\nTekan Enter untuk kembali ke Dashboard...")
-
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_MAGENTA}=== EXECUTE REJOIN PRIVATE SERVER ==={COLOR_RESET}\n")
+def detect_installed_packages():
+    """Detects installed instances of com.altapedia and its clones via package manager."""
+    found_packages = []
+    try:
+        result = subprocess.run(['pm', 'list', 'packages'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode == 0:
+            lines = result.stdout.splitlines()
+            for line in lines:
+                pkg = line.replace('package:', '').strip()
+                if DEFAULT_PACKAGE in pkg or 'altapedia' in pkg.lower():
+                    found_packages.append(pkg)
+    except Exception:
+        found_packages = [f"{DEFAULT_PACKAGE}.liteA", f"{DEFAULT_PACKAGE}.liteB"]
     
-    server_url = config.get('private_server_url')
-    if not server_url:
-        print(f"{COLOR_RED}[X] Error: Link Private Server belum dimasukkan!{COLOR_RESET}")
-        input("\nTekan Enter untuk kembali...")
+    if not found_packages:
+        found_packages = [DEFAULT_PACKAGE]
+        
+    return sorted(list(set(found_packages)))
+
+def auto_hapus_cache(packages):
+    """Clears cache for all detected Altapedia packages."""
+    clear_screen()
+    draw_banner()
+    print(f"{Colors.HEADER}{Colors.BOLD}=== MENU: AUTO HAPUS CACHE ==={Colors.ENDC}\n")
+    
+    print(f"{Colors.OKBLUE}[i] Memulai proses pembersihan cache...{Colors.ENDC}\n")
+    
+    for pkg in packages:
+        print(f" -> Membersihkan cache untuk package: {Colors.OKCYAN}{pkg}{Colors.ENDC}")
+        try:
+            cmd = f"pm clear {pkg}"
+            res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if "Success" in res.stdout:
+                print(f"    {Colors.OKGREEN}[✓] Cache & Data {pkg} Berhasil Dibersihkan!{Colors.ENDC}")
+            else:
+                cache_dir = f"/sdcard/Android/data/{pkg}/cache"
+                subprocess.run(f"rm -rf {cache_dir}/*", shell=True)
+                print(f"    {Colors.OKGREEN}[✓] Folder Cache {pkg} Dibersihkan.{Colors.ENDC}")
+        except Exception as e:
+            print(f"    {Colors.FAIL}[!] Gagal membersihkan {pkg}: {e}{Colors.ENDC}")
+        time.sleep(0.5)
+
+    print(f"\n{Colors.OKGREEN}[✓] Seluruh proses pembersihan cache selesai!{Colors.ENDC}")
+    input(f"\n{Colors.GRAY}Tekan [Enter] untuk kembali ke Dashboard...{Colors.ENDC}")
+
+def input_private_server(config):
+    """Allows user to enter and update the Altapedia Private Server URL."""
+    clear_screen()
+    draw_banner()
+    print(f"{Colors.HEADER}{Colors.BOLD}=== MENU: MASUKKAN LINK PRIVATE SERVER ==={Colors.ENDC}\n")
+    
+    current_link = config.get("private_server", "")
+    if current_link:
+        print(f"Link Terpasang Saat Ini:\n{Colors.OKCYAN}{current_link}{Colors.ENDC}\n")
+    else:
+        print(f"{Colors.WARNING}[!] Belum ada link Private Server yang tersimpan.{Colors.ENDC}\n")
+        
+    print("Masukkan Link Private Server ALTAPEDIA baru (atau tekan Enter untuk batal):")
+    new_link = input(f"{Colors.BOLD}URL: {Colors.ENDC}").strip()
+    
+    if new_link:
+        config["private_server"] = new_link
+        save_config(config)
+        print(f"\n{Colors.OKGREEN}[✓] Link Private Server Berhasil Disimpan!{Colors.ENDC}")
+    else:
+        print(f"\n{Colors.WARNING}[i] Tidak ada perubahan link.{Colors.ENDC}")
+        
+    time.sleep(1.5)
+
+def configure_launch_options(config):
+    """Configures force stop behavior and intent launch modes."""
+    clear_screen()
+    draw_banner()
+    print(f"{Colors.HEADER}{Colors.BOLD}=== MENU: PENGATURAN TINGKAT LANJUT ==={Colors.ENDC}\n")
+    
+    current_fs = config.get("force_stop_before_launch", True)
+    status_fs = f"{Colors.OKGREEN}AKTIF (Direkomendasikan){Colors.ENDC}" if current_fs else f"{Colors.FAIL}NONAKTIF{Colors.ENDC}"
+    
+    print(f"1. Auto Force Stop App Sebelum Rejoin : {status_fs}")
+    print(f"   (Menutup aplikasi terlebih dahulu agar link Private Server langsung terbaca)\n")
+    
+    print("PILIHAN:")
+    print(" [1] Toggle Auto Force Stop (Aktif/Nonaktif)")
+    print(" [0] Kembali ke Dashboard")
+    print()
+    
+    choice = input(f"{Colors.OKCYAN}Pilih opsi [0-1]: {Colors.ENDC}").strip()
+    if choice == "1":
+        config["force_stop_before_launch"] = not current_fs
+        save_config(config)
+        print(f"\n{Colors.OKGREEN}[✓] Pengaturan Force Stop Diperbarui!{Colors.ENDC}")
+        time.sleep(1)
+    else:
         return
 
-    packages = config.get('detected_packages', [])
-    if not packages:
-        packages = auto_detect_altapedia()
-        config['detected_packages'] = packages
-        save_config(config)
-
-    interval = config.get('duration_seconds', 20)
-
-    print(f"Target Server : {COLOR_CYAN}{server_url}{COLOR_RESET}")
-    print(f"Jumlah Clone  : {COLOR_GREEN}{len(packages)} Aplikasi Terinstal{COLOR_RESET}")
-    print(f"Interval Timer: {COLOR_YELLOW}{interval} Detik per Aplikasi (Kelipatan 20){COLOR_RESET}\n")
-
-    print(f"{COLOR_MAGENTA}[!] Tekan CTRL+C untuk menghentikan proses.{COLOR_RESET}\n")
-    time.sleep(2)
-
+def launch_app_and_rejoin(package_name, server_link, force_stop=True):
+    """
+    Launches specified app package directly into the Private Server using precise Android Intents.
+    Includes auto force-stop to clear stuck home menus and explicit package targeting (-p).
+    """
     try:
-        for idx, pkg in enumerate(packages, start=1):
-            staggered_delay = interval * idx
-            print(f"{COLOR_GREEN}[+] [{idx}/{len(packages)}] Opening Package: {pkg}{COLOR_RESET}")
-            print(f"{COLOR_YELLOW}    -> Joining Target: {server_url}{COLOR_RESET}")
-            print(f"{COLOR_CYAN}    -> Timer Activation: {staggered_delay}s (Interval #{idx}){COLOR_RESET}")
-
-            # Peluncuran Aplikasi & Auto Join Map (2-Stage Launch)
-            send_deep_link_intent(pkg, server_url)
-            print(f"{COLOR_GREEN}    [✓] Signal awal & Deep Link terkirim ke {pkg}...{COLOR_RESET}")
+        # Step 1: Force Stop app if enabled so it resets from home menu state
+        if force_stop:
+            subprocess.run(f"am force-stop {package_name}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1.0)
             
-            # Re-Push Intent khusus clone ke-2 dan seterusnya untuk memaksa auto-teleport ke map
-            if idx > 1:
-                print(f"{COLOR_YELLOW}    [~] Memicu Re-Push Deep Link (Teleport ke Map)...{COLOR_RESET}")
-                time.sleep(3)
-                cmd_repush = [
-                    "am", "start",
-                    "-a", "android.intent.action.VIEW",
-                    "-d", server_url,
-                    "-p", pkg,
-                    "--activity-clear-top",
-                    "--activity-new-task"
-                ]
-                subprocess.run(cmd_repush, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print(f"{COLOR_GREEN}    [✓] Re-Push Deep Link berhasil dikirim ke {pkg}!{COLOR_RESET}")
+        if server_link:
+            # Primary Intent Method: Target package directly with VIEW action + FLAG_ACTIVITY_NEW_TASK & CLEAR_TOP
+            cmd_primary = (
+                f'am start -a android.intent.action.VIEW '
+                f'-d "{server_link}" '
+                f'-p {package_name} '
+                f'-f 0x10000000 -f 0x04000000 '
+                f'--activity-clear-top'
+            )
             
-            # Hitung Mundur Sisa Waktu Jeda
-            remaining_time = interval - (5.5 if idx > 1 else 2.5)
-            if remaining_time < 1:
-                remaining_time = 1
+            res = subprocess.run(cmd_primary, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            # Fallback Method if -p parameter is rejected on modified Android ROMs/Cloners
+            if "Error" in res.stderr or "Error" in res.stdout:
+                cmd_fallback = (
+                    f'am start -a android.intent.action.VIEW '
+                    f'-d "{server_link}" '
+                    f'-n {package_name}/com.roblox.client.ActivityProtocolLaunch '
+                    f'-f 0x10000000'
+                )
+                subprocess.run(cmd_fallback, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            cmd = f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+        return True
+    except Exception as e:
+        return False
 
-            for t in range(int(remaining_time), 0, -1):
-                sys.stdout.write(f"\r        Sisa Waktu Jeda: {t}s ")
-                sys.stdout.flush()
-                time.sleep(1)
-            print("\r        [✓] Interval Selesai!                    \n")
+def countdown_timer(seconds, message=""):
+    """Displays a dynamic countdown timer in the terminal."""
+    for remaining in range(seconds, 0, -1):
+        mins, secs = divmod(remaining, 60)
+        time_str = f"{mins:02d}:{secs:02d}"
+        sys.stdout.write(f"\r{Colors.OKBLUE}[⏳] {message} - Menunggu: {Colors.BOLD}{Colors.WARNING}{time_str}{Colors.ENDC}  ")
+        sys.stdout.flush()
+        time.sleep(1)
+    print()
 
-        print(f"{COLOR_GREEN}{COLOR_BOLD}[✓] SEMUA CLONE ALTAPEDIA BERHASIL REJOIN KE MAP!{COLOR_RESET}")
+def menu_rejoin_server(config, installed_packages):
+    """Executes the automated rejoin process with staggered clone delays."""
+    clear_screen()
+    draw_banner()
+    print(f"{Colors.HEADER}{Colors.BOLD}=== MENU: REJOIN SERVER AUTOMATION ==={Colors.ENDC}\n")
+    
+    server_link = config.get("private_server", "").strip()
+    if not server_link:
+        print(f"{Colors.FAIL}[!] Link Private Server belum diisi!{Colors.ENDC}")
+        print(f"Silakan atur link terlebih dahulu di menu 3.")
+        input(f"\n{Colors.GRAY}Tekan [Enter] untuk kembali...{Colors.ENDC}")
+        return
+
+    force_stop_enabled = config.get("force_stop_before_launch", True)
+
+    print(f"{Colors.OKCYAN}Aplikasi Terdeteksi ({len(installed_packages)}):{Colors.ENDC}")
+    for idx, pkg in enumerate(installed_packages, 1):
+        print(f"  {idx}. {pkg}")
+    print()
+    
+    print(f"{Colors.BOLD}Pengaturan Durasi Jeda Rejoin:{Colors.ENDC}")
+    try:
+        base_dur_input = input("Masukkan durasi dasar per-loop (dalam detik, default 60): ").strip()
+        base_duration = int(base_dur_input) if base_dur_input.isdigit() else 60
+    except ValueError:
+        base_duration = 60
+
+    print(f"\n{Colors.WARNING}[i] Skema kelipatan jeda clone diaktifkan:{Colors.ENDC}")
+    print(f"    - Main App / App 1: Langsung Buka")
+    for i in range(1, len(installed_packages)):
+        print(f"    - Clone #{i:<9} : +{i * 20} detik kelipatan")
+        
+    print(f"\n{Colors.OKGREEN}[▶] Memulai Otomatisasi Rejoin Private Server... (Tekan Ctrl+C untuk Stop){Colors.ENDC}\n")
+    time.sleep(2)
+    
+    loop_count = 1
+    try:
+        while True:
+            print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
+            print(f"{Colors.BOLD}🚀 LOOPS REJOIN #{loop_count} | {datetime.now().strftime('%H:%M:%S')}{Colors.ENDC}")
+            print(f"{Colors.HEADER}--------------------------------------------------{Colors.ENDC}")
+            
+            for index, pkg in enumerate(installed_packages):
+                clone_delay = index * 20
+                
+                if clone_delay > 0:
+                    print(f"\n{Colors.GRAY}[+] Persiapan membuka clone ke-{index} ({pkg})...{Colors.ENDC}")
+                    countdown_timer(clone_delay, f"Jeda Kelipatan 20s untuk {pkg}")
+                
+                print(f"{Colors.OKGREEN}[✓] Membuka Aplikasi: {Colors.BOLD}{pkg}{Colors.ENDC}")
+                if force_stop_enabled:
+                    print(f"    {Colors.GRAY}[i] Force stopping {pkg} untuk pembersihan session...{Colors.ENDC}")
+                print(f"    Meluncurkan Ke Private Server via Direct Intent...")
+                
+                success = launch_app_and_rejoin(pkg, server_link, force_stop=force_stop_enabled)
+                if success:
+                    print(f"    {Colors.OKCYAN}[SUCCESS] Deep Link Private Server terkirim ke {pkg}{Colors.ENDC}")
+                else:
+                    print(f"    {Colors.FAIL}[FAILED] Gagal membuka {pkg}{Colors.ENDC}")
+            
+            print(f"\n{Colors.OKBLUE}[i] Seluruh clone telah di-rejoin.{Colors.ENDC}")
+            countdown_timer(base_duration, f"Menunggu Iterasi Loop Berikutnya (#{loop_count + 1})")
+            loop_count += 1
+
     except KeyboardInterrupt:
-        print(f"\n\n{COLOR_RED}[!] Rejoin Server dihentikan.{COLOR_RESET}")
+        print(f"\n\n{Colors.WARNING}[!] Rejoin Server Dihentikan oleh Pengguna.{Colors.ENDC}")
+        time.sleep(2)
 
-    input("\nTekan Enter untuk kembali ke Dashboard...")
+def show_dashboard(config, packages):
+    """Displays the main interactive dashboard UI."""
+    clear_screen()
+    draw_banner()
+    
+    server_status = config.get("private_server", "")
+    if not server_status:
+        server_status = f"{Colors.FAIL}Belum diatur{Colors.ENDC}"
+    else:
+        server_status = f"{Colors.OKGREEN}{server_status[:38]}...{Colors.ENDC}"
+        
+    fs_status = "AKTIF" if config.get("force_stop_before_launch", True) else "NONAKTIF"
 
-def render_dashboard(config):
-    """Menampilkan Dashboard Status Sistem."""
-    print_banner()
-    print(f"{COLOR_BOLD}{COLOR_BLUE}==================== DASHBOARD SYSTEM ===================={COLOR_RESET}")
-    print(f" Status Akses Key  : {COLOR_GREEN}[ONLINE VIP / ACTIVE]{COLOR_RESET}")
-    print(f" Target GitHub Repo: {COLOR_CYAN}{config['github_repo']}{COLOR_RESET}")
-    print(f" App Terdeteksi    : {COLOR_YELLOW}{len(config.get('detected_packages', []))} Package Clone{COLOR_RESET}")
-    print(f" Private Server    : {COLOR_GREEN}{config['private_server_url'] if config['private_server_url'] else 'Belum Diatur'}{COLOR_RESET}")
-    print(f" Interval Durasi   : {COLOR_MAGENTA}{config['duration_seconds']} Detik (Kelipatan 20){COLOR_RESET}")
-    print(f" Sync GitHub       : {COLOR_WHITE}{config['last_sync']}{COLOR_RESET}")
-    print(f"{COLOR_BLUE}=========================================================={COLOR_RESET}\n")
+    print(f"{Colors.OKBLUE}══════════════════════════════════════════════════════════════{Colors.ENDC}")
+    print(f"{Colors.BOLD}                       DASHBOARD STATUS                       {Colors.ENDC}")
+    print(f"{Colors.OKBLUE}══════════════════════════════════════════════════════════════{Colors.ENDC}")
+    print(f" Status Lisensi     : {Colors.OKGREEN}[✓] SUPREME VIP ACTIVE{Colors.ENDC}")
+    print(f" Key Terpasang      : {Colors.BOLD}{config.get('key')}{Colors.ENDC}")
+    print(f" Package Utama      : {Colors.OKCYAN}{DEFAULT_PACKAGE}{Colors.ENDC}")
+    print(f" Clone Terdeteksi   : {Colors.BOLD}{len(packages)} Aplikasi{Colors.ENDC}")
+    print(f" Private Server     : {server_status}")
+    print(f" Auto Force Stop    : {Colors.OKCYAN}{fs_status}{Colors.ENDC}")
+    print(f" Sync Data Server   : {Colors.OKGREEN}GitHub Synced{Colors.ENDC}")
+    print(f"{Colors.OKBLUE}══════════════════════════════════════════════════════════════{Colors.ENDC}\n")
 
-def main_menu():
-    """Fungsi utama pengendali aplikasi."""
+    print(f"{Colors.BOLD}MENU UTAMA:{Colors.ENDC}")
+    print(f" [{Colors.OKGREEN}1{Colors.ENDC}] 📊 Dashboard (Refresh Data)")
+    print(f" [{Colors.OKGREEN}2{Colors.ENDC}] 🧹 Auto Hapus Cache ({len(packages)} App)")
+    print(f" [{Colors.OKGREEN}3{Colors.ENDC}] 🔗 Masukkan Link Private Server")
+    print(f" [{Colors.OKGREEN}4{Colors.ENDC}] 🔄 Rejoin Server (Start Auto Reopen)")
+    print(f" [{Colors.OKGREEN}5{Colors.ENDC}] ⚙️ Pengaturan Advance (Force Stop Toggle)")
+    print(f" [{Colors.OKGREEN}6{Colors.ENDC}] 🔑 Informasi Key & GitHub Sync")
+    print(f" [{Colors.FAIL}0{Colors.ENDC}] 🚪 Keluar Script")
+    print()
+
+def main():
+    """Main program entry loop."""
     config = load_config()
-    key_system_menu()
-
-    config['detected_packages'] = auto_detect_altapedia()
-    save_config(config)
-
+    
+    if not verify_key(config):
+        print(f"{Colors.FAIL}[!] Akses ditolak.{Colors.ENDC}")
+        sys.exit(1)
+        
     while True:
-        render_dashboard(config)
-        print(f"{COLOR_BOLD}MENU UTAMA ALTAPEDIA:{COLOR_RESET}")
-        print(f"{COLOR_WHITE}1. Dashboard & Status Deteksi Aplikasi{COLOR_RESET}")
-        print(f"{COLOR_WHITE}2. Auto Hapus Cache (com.altapedia){COLOR_RESET}")
-        print(f"{COLOR_WHITE}3. Masukkan Link Private Server{COLOR_RESET}")
-        print(f"{COLOR_WHITE}4. Pengaturan Durasi Rejoin (Kelipatan 20){COLOR_RESET}")
-        print(f"{COLOR_WHITE}5. Jalankan Rejoin Server{COLOR_RESET}")
-        print(f"{COLOR_WHITE}6. Sinkronisasi Data ke GitHub{COLOR_RESET}")
-        print(f"{COLOR_WHITE}0. Keluar Script{COLOR_RESET}\n")
-
-        choice = input(f"{COLOR_CYAN}Pilih opsi menu [0-6]: {COLOR_RESET}").strip()
-
-        if choice == '1':
-            config['detected_packages'] = auto_detect_altapedia()
-            save_config(config)
-            input("\nTekan Enter untuk melanjutkan...")
-        elif choice == '2':
-            auto_clear_cache(config.get('detected_packages', []))
-        elif choice == '3':
+        installed_packages = detect_installed_packages()
+        
+        show_dashboard(config, installed_packages)
+        choice = input(f"{Colors.BOLD}{Colors.OKCYAN}Pilih Menu [0-6]: {Colors.ENDC}").strip()
+        
+        if choice == "1":
+            print(f"\n{Colors.OKGREEN}[i] Memperbarui dashboard...{Colors.ENDC}")
+            time.sleep(1)
+        elif choice == "2":
+            auto_hapus_cache(installed_packages)
+        elif choice == "3":
             input_private_server(config)
-        elif choice == '4':
-            config['duration_seconds'] = select_duration_multiples_20()
-            save_config(config)
-        elif choice == '5':
-            run_rejoin_server(config)
-        elif choice == '6':
-            sync_github_data(config)
-        elif choice == '0':
-            print(f"\n{COLOR_GREEN}Terima kasih telah memakai script ALTAPEDIA!{COLOR_RESET}")
+        elif choice == "4":
+            menu_rejoin_server(config, installed_packages)
+        elif choice == "5":
+            configure_launch_options(config)
+        elif choice == "6":
+            clear_screen()
+            draw_banner()
+            print(f"{Colors.HEADER}=== INFORMASI LISENSI & GITHUB DATA ==={Colors.ENDC}\n")
+            print(f" Key Aktif  : {config.get('key')}")
+            print(f" GitHub Repo: https://github.com/snicehub/Rejoin")
+            print(f" Target Package: {DEFAULT_PACKAGE}")
+            print(f"\n{Colors.GRAY}Catatan: Data konfigurasi tersimpan otomatis di local storage Termux.{Colors.ENDC}")
+            input(f"\nTekan [Enter] untuk kembali ke Dashboard...")
+        elif choice == "0":
+            print(f"\n{Colors.OKGREEN}Terima kasih telah menggunakan ALTAPEDIA Rejoin Script!{Colors.ENDC}")
             sys.exit(0)
         else:
-            print(f"\n{COLOR_RED}[!] Pilihan tidak valid!{COLOR_RESET}")
+            print(f"\n{Colors.FAIL}[!] Pilihan tidak valid. Silakan coba lagi.{Colors.ENDC}")
             time.sleep(1)
 
 if __name__ == "__main__":
     try:
-        main_menu()
-    except KeyboardInterrupt:
-        print(f"\n\n{COLOR_YELLOW}[!] Script ditutup.{COLOR_RESET}")
-        sys.exit(0)
+        main()
+    except Exception as err:
+        print(f"\n{Colors.FAIL}[!] Terjadi kesalahan fatal: {err}{Colors.ENDC}")
+        sys.exit(1)

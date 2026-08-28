@@ -15,7 +15,7 @@ get_installed_packages() {
     local target_list="com.altapedia.liteA com.altapedia.liteB com.altapedia.liteC com.altapedia.liteD com.altapedia.liteE com.altapedia.liteF com.altapedia.liteG com.altapedia.liteH com.altapedia.liteI com.altapedia.liteJ com.altapedia.liteK com.altapedia.liteL com.altapedia.liteM com.altapedia.liteN com.altapedia.liteO"
     
     for pkg in $target_list; do
-        if $SU_CMD "[ -d /data/data/$pkg ] || [ -d /data/app/$pkg* ]" 2>/dev/null; then
+        if $SU_CMD "[ -d /data/data/$pkg ]" 2>/dev/null; then
             detected="$detected $pkg"
         fi
     done

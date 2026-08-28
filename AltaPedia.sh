@@ -13,11 +13,13 @@ fi
 run_clear_cache() {
     stty sane 2>/dev/null
     clear
-    echo -e "\033[1;33m[*] Memindai aplikasi yang mengandung kata 'com.altapedia'...\033[0m"
-    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep 'com.altapedia' | sort)
+    echo -e "\033[1;33m[*] Memindai aplikasi yang mengandung kata 'altapedia'...\033[0m"
+    
+    # Mengambil list package resmi dari sistem dan memfilter yang mengandung kata altapedia
+    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep -i "altapedia" | sort)
 
     if [ -z "$PACKAGES" ]; then
-        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan kata 'com.altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
+        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan kata 'altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
         sleep 2
         return
     fi
@@ -43,11 +45,12 @@ run_clear_cache() {
 run_auto_join() {
     stty sane 2>/dev/null
     clear
-    echo -e "\033[1;33m[*] Memindai aplikasi yang mengandung kata 'com.altapedia'...\033[0m"
-    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep 'altapedia' | sort)
+    echo -e "\033[1;33m[*] Memindai aplikasi yang mengandung kata 'altapedia'...\033[0m"
+    
+    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep -i "altapedia" | sort)
 
     if [ -z "$PACKAGES" ]; then
-        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan kata 'com.altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
+        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan kata 'altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
         sleep 2
         return
     fi

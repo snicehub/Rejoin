@@ -10,16 +10,33 @@ else
     SU_CMD="su -c"
 fi
 
+# Fungsi untuk mendeteksi hanya aplikasi altapedia yang benar-benar terinstal
+get_installed_packages() {
+    local detected=""
+    # Daftar lengkap variasi package yang akan dicek satu per satu di sistem
+    local target_list="com.altapedia.liteA com.altapedia.liteB com.altapedia.liteC com.altapedia.liteD com.altapedia.liteE com.altapedia.liteF com.altapedia.liteG com.altapedia.liteH com.altapedia.liteI com.altapedia.liteJ com.altapedia.liteK com.altapedia.liteL com.altapedia.liteM com.altapedia.liteN com.altapedia.liteO"
+    
+    for pkg in $target_list; do
+        # Cek apakah package terinstal di sistem Android
+        local check=$($SU_CMD "pm path $pkg" 2>/dev/null)
+        if [ ! -z "$check" ]; then
+            detected="$detected $pkg"
+        fi
+    done
+    
+    # Hilangkan spasi berlebih di awal/akhir
+    echo "$detected" | xargs
+}
+
 run_clear_cache() {
     stty sane 2>/dev/null
     clear
-    echo -e "\033[1;33m[*] Memindai aplikasi yang mengandung kata 'altapedia'...\033[0m"
+    echo -e "\033[1;33m[*] Memindai aplikasi Altapedia yang terinstal...\033[0m"
     
-    # Mengambil list package resmi dari sistem dan memfilter yang mengandung kata altapedia
-    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep -i "altapedia" | sort)
+    PACKAGES=$(get_installed_packages)
 
     if [ -z "$PACKAGES" ]; then
-        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan kata 'altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
+        echo -e "\n\033[1;31m[!] Tidak ada aplikasi Altapedia yang terinstal di HP ini! Sistem dibatalkan.\033[0m"
         sleep 2
         return
     fi
@@ -45,12 +62,12 @@ run_clear_cache() {
 run_auto_join() {
     stty sane 2>/dev/null
     clear
-    echo -e "\033[1;33m[*] Memindai aplikasi yang mengandung kata 'altapedia'...\033[0m"
+    echo -e "\033[1;33m[*] Memindai aplikasi Altapedia yang terinstal...\033[0m"
     
-    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep -i "altapedia" | sort)
+    PACKAGES=$(get_installed_packages)
 
     if [ -z "$PACKAGES" ]; then
-        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan kata 'altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
+        echo -e "\n\033[1;31m[!] Tidak ada aplikasi Altapedia yang terinstal di HP ini! Sistem dibatalkan.\033[0m"
         sleep 2
         return
     fi
@@ -148,6 +165,7 @@ while true; do
     printf "███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║\n"
     printf "██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║\n"
     printf "██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║\n"
+    printf "╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝\n"
     printf "╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝\n"
     printf "\033[1;37mVersion 1.0.0\033[0m\n\n"
     echo "======================================================================="

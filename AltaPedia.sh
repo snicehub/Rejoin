@@ -13,11 +13,11 @@ fi
 run_clear_cache() {
     stty sane 2>/dev/null
     clear
-    echo -e "\033[1;33m[*] Memindai aplikasi kloningan Altapedia...\033[0m"
-    PACKAGES=$($SU_CMD "pm list packages | grep altapedia" | sed 's/package://g' | tr -d '\r' | sort)
+    echo -e "\033[1;33m[*] Memindai aplikasi khusus com.altapedia...\033[0m"
+    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep '^com\.altapedia' | sort)
 
     if [ -z "$PACKAGES" ]; then
-        echo -e "\n\033[1;31m[!] Tidak ada aplikasi Altapedia yang terdeteksi! Sistem dibatalkan.\033[0m"
+        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan package 'com.altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
         sleep 2
         return
     fi
@@ -43,11 +43,11 @@ run_clear_cache() {
 run_auto_join() {
     stty sane 2>/dev/null
     clear
-    echo -e "\033[1;33m[*] Memindai aplikasi kloningan Altapedia...\033[0m"
-    PACKAGES=$($SU_CMD "pm list packages | grep altapedia" | sed 's/package://g' | tr -d '\r' | sort)
+    echo -e "\033[1;33m[*] Memindai aplikasi khusus com.altapedia...\033[0m"
+    PACKAGES=$($SU_CMD "pm list packages" | sed 's/package://g' | tr -d '\r' | grep '^com\.altapedia' | sort)
 
     if [ -z "$PACKAGES" ]; then
-        echo -e "\n\033[1;31m[!] Tidak ada aplikasi Altapedia yang terdeteksi! Sistem dibatalkan.\033[0m"
+        echo -e "\n\033[1;31m[!] Tidak ada aplikasi dengan package 'com.altapedia' yang terdeteksi! Sistem dibatalkan.\033[0m"
         sleep 2
         return
     fi
@@ -56,7 +56,6 @@ run_auto_join() {
     echo -e "\033[1;32m       MASUKKAN LINK PRIVATE SERVER     \033[0m"
     echo -e "\033[1;32m========================================\033[0m"
 
-    # Ubah list packages ke dalam bentuk array agar mudah diindeks
     i=1
     declare -a PKG_ARRAY
     declare -a LINK_ARRAY
@@ -141,7 +140,7 @@ while true; do
     clear
     # Logo warna Orange (ANSI 38;5;208)
     printf "\033[38;5;208m"
-    printf " █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗ \n"
+    printf " █████╗ ██╗  ████████╗█████╗ ██████╗ ███████╗██████╗ ██╗ █████╗ \n"
     printf "██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗\n"
     printf "███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║\n"
     printf "██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║\n"

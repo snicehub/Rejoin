@@ -284,36 +284,36 @@ def sync_github_data(config):
 
 def send_deep_link_intent(pkg, server_url):
     """
-    Mengirim intent khusus Android agar clone app dipaksa 
-    langsung masuk ke dalam map/private server tanpa tertahan di Beranda.
+    Mengirim intent peluncuran aplikasi dan deep link private server.
+    Menggunakan teknik 2-Stage Launch (Main Intent -> Delay -> View Deep Link)
+    agar aplikasi clone pasti terbuka dan langsung masuk ke dalam map.
     """
-    # 1. Intent Standar dengan Package Direct Target
-    cmd1 = [
-        "am", "start",
-        "-a", "android.intent.action.VIEW",
-        "-d", server_url,
-        "-p", pkg,
-        "--activity-clear-top",
-        "--activity-new-task"
-    ]
-    subprocess.run(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    # 2. Intent Khusus ke Component Launch Activity Roblox Clone
-    activities = [
-        f"{pkg}/com.roblox.client.ActivityProtocolLaunchActivity",
-        f"{pkg}/com.roblox.client.RobloxActivity"
-    ]
-    
-    for act in activities:
-        cmd2 = [
+    try:
+        # Stage 1: Buka/Bangunkan aplikasi clone ke foreground
+        cmd_main = [
+            "am", "start",
+            "-a", "android.intent.action.MAIN",
+            "-c", "android.intent.category.LAUNCHER",
+            "-p", pkg,
+            "--activity-new-task"
+        ]
+        subprocess.run(cmd_main, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Jeda 2.5 detik agar engine aplikasi clone selesai inisialisasi
+        time.sleep(2.5)
+        
+        # Stage 2: Kirim Intent Deep Link Private Server
+        cmd_view = [
             "am", "start",
             "-a", "android.intent.action.VIEW",
             "-d", server_url,
-            "-n", act,
+            "-p", pkg,
             "--activity-clear-top",
             "--activity-new-task"
         ]
-        subprocess.run(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(cmd_view, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 def run_rejoin_server(config):
     """Menjalankan Rejoin Server otomatis dengan perbaikan multi-clone deep link."""
@@ -348,23 +348,31 @@ def run_rejoin_server(config):
             print(f"{COLOR_YELLOW}    -> Joining Target: {server_url}{COLOR_RESET}")
             print(f"{COLOR_CYAN}    -> Timer Activation: {staggered_delay}s (Interval #{idx}){COLOR_RESET}")
 
-            # Peluncuran Pertama (Inisialisasi Clone App)
+            # Peluncuran Aplikasi & Auto Join Map (2-Stage Launch)
             send_deep_link_intent(pkg, server_url)
-            print(f"{COLOR_GREEN}    [✓] Signal awal terkirim ke {pkg}...{COLOR_RESET}")
+            print(f"{COLOR_GREEN}    [✓] Signal awal & Deep Link terkirim ke {pkg}...{COLOR_RESET}")
             
-            # Re-Push Intent (Pemicu ke-2 setelah 4 detik untuk memaksa clone 2+ masuk map jika stuck di Home)
+            # Re-Push Intent khusus clone ke-2 dan seterusnya untuk memaksa auto-teleport ke map
             if idx > 1:
-                print(f"{COLOR_YELLOW}    [~] Memicu Re-Push Intent (Auto-Teleport ke Map)...{COLOR_RESET}")
-                time.sleep(4)
-                send_deep_link_intent(pkg, server_url)
-                print(f"{COLOR_GREEN}    [✓] Deep Link berhasil didorong ulang ke {pkg}!{COLOR_RESET}")
+                print(f"{COLOR_YELLOW}    [~] Memicu Re-Push Deep Link (Teleport ke Map)...{COLOR_RESET}")
+                time.sleep(3)
+                cmd_repush = [
+                    "am", "start",
+                    "-a", "android.intent.action.VIEW",
+                    "-d", server_url,
+                    "-p", pkg,
+                    "--activity-clear-top",
+                    "--activity-new-task"
+                ]
+                subprocess.run(cmd_repush, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print(f"{COLOR_GREEN}    [✓] Re-Push Deep Link berhasil dikirim ke {pkg}!{COLOR_RESET}")
             
             # Hitung Mundur Sisa Waktu Jeda
-            remaining_time = interval - (4 if idx > 1 else 0)
+            remaining_time = interval - (5.5 if idx > 1 else 2.5)
             if remaining_time < 1:
                 remaining_time = 1
 
-            for t in range(remaining_time, 0, -1):
+            for t in range(int(remaining_time), 0, -1):
                 sys.stdout.write(f"\r        Sisa Waktu Jeda: {t}s ")
                 sys.stdout.flush()
                 time.sleep(1)

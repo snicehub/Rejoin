@@ -34,17 +34,17 @@ def draw_banner():
     """Displays the custom ALTAPEDIA ASCII banner."""
     print(f"{Colors.OKCYAN}{Colors.BOLD}")
     print(r"""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║   █████╗ ██╗  ████████╗█████╗ ██████╗ ███████╗██████╗ █████╗ ║
-    ║  ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗║
-    ║  ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║███████║║
-    ║  ██╔══██╗██║     ██║   ██╔══██╗██╔═══╝ ██╔══╝  ██║  ██║██╔══██╗║
-    ║  ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║  ██║║
-    ║  ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝  ╚═╝║
-    ║                                                              ║
-    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION          ║
-    ║                     VERSION 1.1 SUPREME                      ║
-    ╚══════════════════════════════════════════════════════════════╝
+    ╔═══════════════════════════════════════════════════════════════════╗
+    ║  █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗  ║
+    ║ ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗ ║
+    ║ ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║ ║
+    ║ ██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║ ║
+    ║ ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║ ║
+    ║ ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝ ║
+    ║                                                                   ║
+    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION               ║
+    ║                     VERSION 3.5 SUPREME                           ║
+    ╚═══════════════════════════════════════════════════════════════════╝
     """ + Colors.ENDC)
 
 def load_config():
@@ -344,23 +344,26 @@ def menu_rejoin_server(config, installed_packages):
         
         countdown_timer(5, "Menutup Termux")
         
-        print(f"\n{Colors.OKCYAN}[🚪] Menutup Termux...{Colors.ENDC}")
+        print(f"\n{Colors.OKCYAN}[🚪] Menutup Termux & Kembali ke Menu Utama...{Colors.ENDC}")
         time.sleep(0.5)
         
-        # Close Termux forcefully and terminate shell process session
+        # 1. Kembali ke layar Home/Launcher utama (Gambar 1)
+        try:
+            subprocess.run("am start -a android.intent.action.MAIN -c android.intent.category.HOME", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        try:
+            subprocess.run("input keyevent 3", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+        # 2. Hentikan aplikasi Termux secara penuh tanpa meninggalkan terminal prompt ($)
         try:
             subprocess.run("am force-stop com.termux", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
-        try:
-            os.system("pkill -9 -u $(whoami) 2>/dev/null")
-        except Exception:
-            pass
-        try:
-            os.system("kill -9 $PPID 2>/dev/null")
-        except Exception:
-            pass
-        sys.exit(0)
+            
+        os._exit(0)
 
     except KeyboardInterrupt:
         print(f"\n\n{Colors.WARNING}[!] Proses Dihentikan oleh Pengguna.{Colors.ENDC}")

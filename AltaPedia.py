@@ -34,17 +34,17 @@ def draw_banner():
     """Displays the custom ALTAPEDIA ASCII banner."""
     print(f"{Colors.OKCYAN}{Colors.BOLD}")
     print(r"""
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║  █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗  ║
-    ║ ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗ ║
-    ║ ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║ ║
-    ║ ██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║ ║
-    ║ ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║ ║
-    ║ ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝ ║
-    ║                                                                   ║
-    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION               ║
-    ║                     VERSION 3.5 SUPREME                           ║
-    ╚═══════════════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════════════╗
+    ║   █████╗ ██╗  ████████╗█████╗ ██████╗ ███████╗██████╗ █████╗ ║
+    ║  ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗║
+    ║  ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║███████║║
+    ║  ██╔══██╗██║     ██║   ██╔══██╗██╔═══╝ ██╔══╝  ██║  ██║██╔══██╗║
+    ║  ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║  ██║║
+    ║  ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝  ╚═╝║
+    ║                                                              ║
+    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION          ║
+    ║                     VERSION 1.1 SUPREME                      ║
+    ╚══════════════════════════════════════════════════════════════╝
     """ + Colors.ENDC)
 
 def load_config():
@@ -334,20 +334,21 @@ def menu_rejoin_server(config, installed_packages):
             else:
                 print(f"    {Colors.FAIL}[FAILED] Gagal membuka {pkg}{Colors.ENDC}")
         
-        # Penanganan setelah semua aplikasi terbuka: hitung mundur 5 detik lalu keluar & tutup Termux
+        # Penanganan setelah semua aplikasi terbuka: hitung mundur 5 detik lalu navigasi ke Halaman Utama HP
         print(f"\n{Colors.OKGREEN}══════════════════════════════════════════════════════════════{Colors.ENDC}")
         print(f"{Colors.OKGREEN}[✓] Seluruh aplikasi & clone ({len(installed_packages)}) telah berhasil dibuka!{Colors.ENDC}")
-        print(f"{Colors.WARNING}[i] Menutup Termux otomatis dalam waktu 5 detik...{Colors.ENDC}")
+        print(f"{Colors.WARNING}[i] Menampilkan Halaman Utama HP (Home Screen) dalam waktu 5 detik...{Colors.ENDC}")
         print(f"{Colors.OKGREEN}══════════════════════════════════════════════════════════════{Colors.ENDC}\n")
         
-        countdown_timer(5, "Auto-Close Termux")
+        countdown_timer(5, "Kembali ke Home Screen")
         
-        print(f"\n{Colors.FAIL}[🚪] Mematikan sesi Termux... Selesai.{Colors.ENDC}")
+        print(f"\n{Colors.OKCYAN}[🏠] Membuka Halaman Utama HP... Selesai.{Colors.ENDC}")
         time.sleep(0.5)
         
-        # Mematikan aplikasi/sesi Termux
+        # Mengirim intent Android untuk kembali ke Halaman Utama (Home Screen) tanpa mematikan paksa Termux
         try:
-            os.system("pkill -9 -f com.termux")
+            subprocess.run("am start -a android.intent.action.MAIN -c android.intent.category.HOME", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run("input keyevent 3", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
         sys.exit(0)

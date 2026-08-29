@@ -34,17 +34,17 @@ def draw_banner():
     """Displays the custom ALTAPEDIA ASCII banner."""
     print(f"{Colors.OKCYAN}{Colors.BOLD}")
     print(r"""
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║  █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗  ║
-    ║ ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗ ║
-    ║ ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║ ║
-    ║ ██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║ ║
-    ║ ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║ ║
-    ║ ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝ ║
-    ║                                                                   ║
-    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION               ║
-    ║                     VERSION 3.5 SUPREME                           ║
-    ╚═══════════════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════════════╗
+    ║   █████╗ ██╗  ████████╗█████╗ ██████╗ ███████╗██████╗ █████╗ ║
+    ║  ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗║
+    ║  ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║███████║║
+    ║  ██╔══██╗██║     ██║   ██╔══██╗██╔═══╝ ██╔══╝  ██║  ██║██╔══██╗║
+    ║  ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║  ██║║
+    ║  ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝  ╚═╝║
+    ║                                                              ║
+    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION          ║
+    ║                     VERSION 1.1 SUPREME                      ║
+    ╚══════════════════════════════════════════════════════════════╝
     """ + Colors.ENDC)
 
 def load_config():
@@ -241,29 +241,30 @@ def launch_app_and_rejoin(package_name, server_link, force_stop=True):
         # Step 1: Force Stop app if enabled so it resets from home menu state
         if force_stop:
             subprocess.run(f"am force-stop {package_name}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(1.0)
+            time.sleep(1.5)
             
         if server_link:
-            # Primary Intent Method: Target package directly with VIEW action + FLAG_ACTIVITY_NEW_TASK & CLEAR_TOP
+            clean_link = server_link.strip()
+            
+            # Method 1: Direct ActivityProtocolLaunch Component (Bypasses Home/Beranda screen on clones)
+            cmd_component = (
+                f'am start -a android.intent.action.VIEW '
+                f'-d "{clean_link}" '
+                f'-n {package_name}/com.roblox.client.ActivityProtocolLaunch '
+                f'-f 0x14000000'
+            )
+            subprocess.run(cmd_component, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+            time.sleep(0.5)
+
+            # Method 2: Target package directly with VIEW action + FLAG_ACTIVITY_NEW_TASK & CLEAR_TOP
             cmd_primary = (
                 f'am start -a android.intent.action.VIEW '
-                f'-d "{server_link}" '
+                f'-d "{clean_link}" '
                 f'-p {package_name} '
-                f'-f 0x10000000 -f 0x04000000 '
-                f'--activity-clear-top'
+                f'-f 0x14000000'
             )
-            
-            res = subprocess.run(cmd_primary, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            
-            # Fallback Method if -p parameter is rejected on modified Android ROMs/Cloners
-            if "Error" in res.stderr or "Error" in res.stdout:
-                cmd_fallback = (
-                    f'am start -a android.intent.action.VIEW '
-                    f'-d "{server_link}" '
-                    f'-n {package_name}/com.roblox.client.ActivityProtocolLaunch '
-                    f'-f 0x10000000'
-                )
-                subprocess.run(cmd_fallback, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(cmd_primary, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
             cmd = f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
             subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -346,9 +347,17 @@ def menu_rejoin_server(config, installed_packages):
         print(f"\n{Colors.OKCYAN}[🚪] Menutup Termux...{Colors.ENDC}")
         time.sleep(0.5)
         
-        # Menutup aplikasi Termux secara paksa (hanya package com.termux), clone tetap berjalan
+        # Close Termux forcefully and terminate shell process session
         try:
             subprocess.run("am force-stop com.termux", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        try:
+            os.system("pkill -9 -u $(whoami) 2>/dev/null")
+        except Exception:
+            pass
+        try:
+            os.system("kill -9 $PPID 2>/dev/null")
         except Exception:
             pass
         sys.exit(0)

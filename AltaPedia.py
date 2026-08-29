@@ -347,11 +347,18 @@ def menu_rejoin_server(config, installed_packages):
         print(f"\n{Colors.OKCYAN}[🚪] Menutup Termux & Menjaga Aplikasi Clone Tetap Berjalan...{Colors.ENDC}")
         time.sleep(0.5)
 
-        # Hentikan hanya aplikasi Termux tanpa kembali ke Launcher/Home agar clone tidak tertutup/ter-minimize
+        # Hentikan aplikasi Termux menggunakan eksekusi root SU (sesuai skrip bash)
         try:
-            subprocess.run("am force-stop com.termux", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if os.path.exists("/system/xbin/su"):
+                su_cmd = "/system/xbin/su -c"
+            elif os.path.exists("/system/bin/su"):
+                su_cmd = "/system/bin/su -c"
+            else:
+                su_cmd = "su -c"
+                
+            subprocess.run(f'{su_cmd} "am force-stop com.termux"', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
-            pass
+            subprocess.run("am force-stop com.termux", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
         os._exit(0)
 

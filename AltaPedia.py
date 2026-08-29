@@ -34,17 +34,17 @@ def draw_banner():
     """Displays the custom ALTAPEDIA ASCII banner."""
     print(f"{Colors.OKCYAN}{Colors.BOLD}")
     print(r"""
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║  █████╗ ██╗  ████████╗██████╗ ██████╗ ███████╗██████╗ ██╗ █████╗  ║
-    ║ ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██║██╔══██╗ ║
-    ║ ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║██║███████║ ║
-    ║ ██╔══██║██║     ██║   ██╔══██║██╔═══╝ ██╔══╝  ██║  ██║██║██╔══██║ ║
-    ║ ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║██║  ██║ ║
-    ║ ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝╚═╝  ╚═╝ ║
-    ║                                                                   ║
-    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION               ║
-    ║                     VERSION 3.5 SUPREME                           ║
-    ╚═══════════════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════════════╗
+    ║   █████╗ ██╗  ████████╗█████╗ ██████╗ ███████╗██████╗ █████╗ ║
+    ║  ██╔══██╗██║  ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██╔══██╗██╔══██╗║
+    ║  ███████║██║     ██║   ███████║██████╔╝█████╗  ██║  ██║███████║║
+    ║  ██╔══██╗██║     ██║   ██╔══██╗██╔═══╝ ██╔══╝  ██║  ██║██╔══██╗║
+    ║  ██║  ██║███████╗██║   ██║  ██║██║     ███████╗██████╔╝██║  ██║║
+    ║  ╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚══════╝╚═════╝ ╚═╝  ╚═╝║
+    ║                                                              ║
+    ║             TERMUX REJOIN SERVER & CLONE AUTOMATION          ║
+    ║                     VERSION 1.1 SUPREME                      ║
+    ╚══════════════════════════════════════════════════════════════╝
     """ + Colors.ENDC)
 
 def load_config():
@@ -54,7 +54,7 @@ def load_config():
         "private_server": "",
         "base_duration": 60,
         "clone_step": 20,
-        "force_stop_before_launch": True,
+        "force_stop_before_launch": False,
         "launch_mode": "Standard (-p)",
         "clones": []
     }
@@ -296,7 +296,7 @@ def menu_rejoin_server(config, installed_packages):
         input(f"\n{Colors.GRAY}Tekan [Enter] untuk kembali...{Colors.ENDC}")
         return
 
-    force_stop_enabled = config.get("force_stop_before_launch", True)
+    force_stop_enabled = config.get("force_stop_before_launch", False)
 
     print(f"{Colors.OKCYAN}Aplikasi Terdeteksi ({len(installed_packages)}):{Colors.ENDC}")
     for idx, pkg in enumerate(installed_packages, 1):
@@ -344,20 +344,10 @@ def menu_rejoin_server(config, installed_packages):
         
         countdown_timer(5, "Menutup Termux")
         
-        print(f"\n{Colors.OKCYAN}[🚪] Menutup Termux & Kembali ke Menu Utama...{Colors.ENDC}")
+        print(f"\n{Colors.OKCYAN}[🚪] Menutup Termux & Menjaga Aplikasi Clone Tetap Berjalan...{Colors.ENDC}")
         time.sleep(0.5)
-        
-        # 1. Kembali ke layar Home/Launcher utama (Gambar 1)
-        try:
-            subprocess.run("am start -a android.intent.action.MAIN -c android.intent.category.HOME", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-        try:
-            subprocess.run("input keyevent 3", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
 
-        # 2. Hentikan aplikasi Termux secara penuh tanpa meninggalkan terminal prompt ($)
+        # Hentikan hanya aplikasi Termux tanpa kembali ke Launcher/Home agar clone tidak tertutup/ter-minimize
         try:
             subprocess.run("am force-stop com.termux", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
